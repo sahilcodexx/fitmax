@@ -163,23 +163,47 @@ class StepTrackingService : Service(), SensorEventListener {
         }
     }
 
+    private var isRegistered = false
+    private var hasHardwareStepCounter = false
+    private var lastHardwareStepTimeMs = 0L
+
     private fun registerSensors() {
-        // 1. Hardware Step Counter (Samsung sensor_hub)
-        val stepCounter = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-        if (stepCounter != null) {
-            sensorManager.registerListener(this, stepCounter, SensorManager.SENSOR_DELAY_NORMAL, 5_000_000, backgroundHandler)
+        if (isRegistered) {
+            Log.d(TAG, "Sensors already registered, skipping duplicate registration")
+            return
         }
+        isRegistered = true
 
-        // 2. Hardware Step Detector (Provides immediate real-time step events)
-        val stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
-        if (stepDetector != null) {
-            sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_FASTEST, 0, backgroundHandler)
-        }
-
-        // 3. Accelerometer (50 Hz for custom real-time DSP pipeline and activity classification)
+        // 1. Accelerometer (50 Hz / 20,000 us for custom DSP & Activity classification)
         val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         if (accel != null) {
-            sensorManager.registerListener(this, accel, 20_000, backgroundHandler)
+            val registered = sensorManager.registerListener(this, accel, 20_000, backgroundHandler)
+            Log.i(TAG, "Registered Accelerometer (50Hz): $registered")
+        }
+
+        // 2. Hardware Step Detector (Immediate real-time pulse)
+        val stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+        if (stepDetector != null) {
+            val registered = sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_NORMAL, backgroundHandler)
+            Log.i(TAG, "Registered Step Detector: $registered")
+        }
+
+        // 3. Hardware Step Counter (Samsung sensor_hub, low-power cumulative)
+        val stepCounter = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+        if (stepCounter != null) {
+            val registered = sensorManager.registerListener(this, stepCounter, SensorManager.SENSOR_DELAY_NORMAL, backgroundHandler)
+            Log.i(TAG, "Registered Step Counter: $registered")
+        }
+    }
+
+    private fun unregisterSensors() {
+        if (!isRegistered) return
+        isRegistered = false
+        try {
+            sensorManager.unregisterListener(this)
+            Log.i(TAG, "Unregistered sensors successfully")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error unregistering sensors", e)
         }
     }
 
@@ -199,6 +223,8 @@ class StepTrackingService : Service(), SensorEventListener {
     }
 
     private fun handleHardwareStepCounter(current: Long) {
+        hasHardwareStepCounter = true
+        lastHardwareStepTimeMs = SystemClock.elapsedRealtime()
         if (lastHardwareSteps == -1L) {
             lastHardwareSteps = current
             return
@@ -242,7 +268,9 @@ class StepTrackingService : Service(), SensorEventListener {
         _liveCadence.value = cadenceMetrics.cadenceStepsPerMinute
 
         val validatedSteps = validator.validate(peaks, confidence)
-        if (validatedSteps.isNotEmpty()) {
+        // If hardware step counter is present and actively reporting, let hardware counter own the step count to avoid double-counting.
+        val hardwareActive = hasHardwareStepCounter && (SystemClock.elapsedRealtime() - lastHardwareStepTimeMs < 15_000)
+        if (validatedSteps.isNotEmpty() && !hardwareActive) {
             commitSteps(validatedSteps.size.toLong())
         }
     }
@@ -295,7 +323,7 @@ class StepTrackingService : Service(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         _isServiceRunning.value = false
-        sensorManager.unregisterListener(this)
+        unregisterSensors()
         wakeLock?.let { if (it.isHeld) it.release() }
         handlerThread.quitSafely()
         serviceJob.cancel()
