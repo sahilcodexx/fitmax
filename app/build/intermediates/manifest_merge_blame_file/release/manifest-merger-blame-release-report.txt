@@ -1,0 +1,213 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.fixmax"
+4    android:versionCode="1"
+5    android:versionName="0.1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="26"
+9        android:targetSdkVersion="35" />
+10
+11    <!-- Permissions required for Samsung Galaxy M35 5G sensor tracking -->
+12    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+12-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:5:5-79
+12-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:5:22-76
+13    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+13-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:6:5-77
+13-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:6:22-74
+14    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+14-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:7:5-84
+14-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:7:22-81
+15    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+15-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:8:5-77
+15-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:8:22-74
+16    <uses-permission android:name="android.permission.WAKE_LOCK" />
+16-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:9:5-68
+16-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:9:22-65
+17    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+17-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:10:5-81
+17-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:10:22-78
+18
+19    <!-- Hardware declarations -->
+20    <uses-feature
+20-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:13:5-15:35
+21        android:name="android.hardware.sensor.accelerometer"
+21-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:14:9-61
+22        android:required="true" />
+22-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:15:9-32
+23    <uses-feature
+23-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:16:5-18:36
+24        android:name="android.hardware.sensor.gyroscope"
+24-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:17:9-57
+25        android:required="false" />
+25-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:18:9-33
+26    <uses-feature
+26-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:19:5-21:36
+27        android:name="android.hardware.sensor.stepcounter"
+27-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:20:9-59
+28        android:required="false" />
+28-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:21:9-33
+29    <uses-feature
+29-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:22:5-24:36
+30        android:name="android.hardware.sensor.stepdetector"
+30-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:23:9-60
+31        android:required="false" />
+31-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:24:9-33
+32
+33    <permission
+33-->[androidx.core:core:1.12.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/db9e2cdb08f49aa21b81d76642713103/transformed/core-1.12.0/AndroidManifest.xml:22:5-24:47
+34        android:name="com.fixmax.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+34-->[androidx.core:core:1.12.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/db9e2cdb08f49aa21b81d76642713103/transformed/core-1.12.0/AndroidManifest.xml:23:9-81
+35        android:protectionLevel="signature" />
+35-->[androidx.core:core:1.12.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/db9e2cdb08f49aa21b81d76642713103/transformed/core-1.12.0/AndroidManifest.xml:24:9-44
+36
+37    <uses-permission android:name="com.fixmax.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+37-->[androidx.core:core:1.12.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/db9e2cdb08f49aa21b81d76642713103/transformed/core-1.12.0/AndroidManifest.xml:26:5-97
+37-->[androidx.core:core:1.12.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/db9e2cdb08f49aa21b81d76642713103/transformed/core-1.12.0/AndroidManifest.xml:26:22-94
+38
+39    <application
+39-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:26:5-62:19
+40        android:name="com.fixmax.FixMaxApp"
+40-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:27:9-44
+41        android:allowBackup="true"
+41-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:28:9-35
+42        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+42-->[androidx.core:core:1.12.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/db9e2cdb08f49aa21b81d76642713103/transformed/core-1.12.0/AndroidManifest.xml:28:18-86
+43        android:extractNativeLibs="false"
+44        android:icon="@android:drawable/ic_dialog_info"
+44-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:29:9-56
+45        android:label="FIX MAX"
+45-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:30:9-32
+46        android:roundIcon="@android:drawable/ic_dialog_info"
+46-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:31:9-61
+47        android:supportsRtl="true"
+47-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:32:9-35
+48        android:theme="@android:style/Theme.Material.Light.NoActionBar" >
+48-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:33:9-72
+49        <activity
+49-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:35:9-43:20
+50            android:name="com.fixmax.MainActivity"
+50-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:36:13-51
+51            android:exported="true"
+51-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:37:13-36
+52            android:theme="@android:style/Theme.Material.Light.NoActionBar" >
+52-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:38:13-76
+53            <intent-filter>
+53-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:39:13-42:29
+54                <action android:name="android.intent.action.MAIN" />
+54-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:40:17-69
+54-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:40:25-66
+55
+56                <category android:name="android.intent.category.LAUNCHER" />
+56-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:41:17-77
+56-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:41:27-74
+57            </intent-filter>
+58        </activity>
+59
+60        <!-- Low-Power / Fallback Foreground Step Tracking Service -->
+61        <service
+61-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:46:9-49:54
+62            android:name="com.fixmax.tracking.StepTrackingService"
+62-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:47:13-67
+63            android:exported="false"
+63-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:48:13-37
+64            android:foregroundServiceType="health" />
+64-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:49:13-51
+65
+66        <!-- Auto-restart on reboot -->
+67        <receiver
+67-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:52:9-60:20
+68            android:name="com.fixmax.tracking.BootCompletedReceiver"
+68-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:53:13-69
+69            android:enabled="true"
+69-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:54:13-35
+70            android:exported="false" >
+70-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:55:13-37
+71            <intent-filter>
+71-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:56:13-59:29
+72                <action android:name="android.intent.action.BOOT_COMPLETED" />
+72-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:57:17-79
+72-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:57:25-76
+73                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+73-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:58:17-84
+73-->/home/sahilcodex/Documents/fitmax/app/src/main/AndroidManifest.xml:58:25-81
+74            </intent-filter>
+75        </receiver>
+76
+77        <provider
+77-->[androidx.emoji2:emoji2:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/7108132e4e6dddd387206ddbe3ea3479/transformed/emoji2-1.3.0/AndroidManifest.xml:24:9-32:20
+78            android:name="androidx.startup.InitializationProvider"
+78-->[androidx.emoji2:emoji2:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/7108132e4e6dddd387206ddbe3ea3479/transformed/emoji2-1.3.0/AndroidManifest.xml:25:13-67
+79            android:authorities="com.fixmax.androidx-startup"
+79-->[androidx.emoji2:emoji2:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/7108132e4e6dddd387206ddbe3ea3479/transformed/emoji2-1.3.0/AndroidManifest.xml:26:13-68
+80            android:exported="false" >
+80-->[androidx.emoji2:emoji2:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/7108132e4e6dddd387206ddbe3ea3479/transformed/emoji2-1.3.0/AndroidManifest.xml:27:13-37
+81            <meta-data
+81-->[androidx.emoji2:emoji2:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/7108132e4e6dddd387206ddbe3ea3479/transformed/emoji2-1.3.0/AndroidManifest.xml:29:13-31:52
+82                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+82-->[androidx.emoji2:emoji2:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/7108132e4e6dddd387206ddbe3ea3479/transformed/emoji2-1.3.0/AndroidManifest.xml:30:17-75
+83                android:value="androidx.startup" />
+83-->[androidx.emoji2:emoji2:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/7108132e4e6dddd387206ddbe3ea3479/transformed/emoji2-1.3.0/AndroidManifest.xml:31:17-49
+84            <meta-data
+84-->[androidx.lifecycle:lifecycle-process:2.7.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/8bf6f3de99a7ae815066990f1e9c115f/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:29:13-31:52
+85                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+85-->[androidx.lifecycle:lifecycle-process:2.7.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/8bf6f3de99a7ae815066990f1e9c115f/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:30:17-78
+86                android:value="androidx.startup" />
+86-->[androidx.lifecycle:lifecycle-process:2.7.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/8bf6f3de99a7ae815066990f1e9c115f/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:31:17-49
+87            <meta-data
+87-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:29:13-31:52
+88                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+88-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:30:17-85
+89                android:value="androidx.startup" />
+89-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:31:17-49
+90        </provider>
+91
+92        <service
+92-->[androidx.room:room-runtime:2.6.1] /home/sahilcodex/.gradle/caches/8.14.3/transforms/d55f92f5d815afe5afe32559b622ac60/transformed/room-runtime-2.6.1/AndroidManifest.xml:24:9-28:63
+93            android:name="androidx.room.MultiInstanceInvalidationService"
+93-->[androidx.room:room-runtime:2.6.1] /home/sahilcodex/.gradle/caches/8.14.3/transforms/d55f92f5d815afe5afe32559b622ac60/transformed/room-runtime-2.6.1/AndroidManifest.xml:25:13-74
+94            android:directBootAware="true"
+94-->[androidx.room:room-runtime:2.6.1] /home/sahilcodex/.gradle/caches/8.14.3/transforms/d55f92f5d815afe5afe32559b622ac60/transformed/room-runtime-2.6.1/AndroidManifest.xml:26:13-43
+95            android:exported="false" />
+95-->[androidx.room:room-runtime:2.6.1] /home/sahilcodex/.gradle/caches/8.14.3/transforms/d55f92f5d815afe5afe32559b622ac60/transformed/room-runtime-2.6.1/AndroidManifest.xml:27:13-37
+96
+97        <receiver
+97-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:34:9-52:20
+98            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+98-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:35:13-76
+99            android:directBootAware="false"
+99-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:36:13-44
+100            android:enabled="true"
+100-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:37:13-35
+101            android:exported="true"
+101-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:38:13-36
+102            android:permission="android.permission.DUMP" >
+102-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:39:13-57
+103            <intent-filter>
+103-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:40:13-42:29
+104                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+104-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:41:17-91
+104-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:41:25-88
+105            </intent-filter>
+106            <intent-filter>
+106-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:43:13-45:29
+107                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+107-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:44:17-85
+107-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:44:25-82
+108            </intent-filter>
+109            <intent-filter>
+109-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:46:13-48:29
+110                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+110-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:47:17-88
+110-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:47:25-85
+111            </intent-filter>
+112            <intent-filter>
+112-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:49:13-51:29
+113                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+113-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:50:17-95
+113-->[androidx.profileinstaller:profileinstaller:1.3.0] /home/sahilcodex/.gradle/caches/8.14.3/transforms/84da63947cbb06aaf60d053583a0f853/transformed/profileinstaller-1.3.0/AndroidManifest.xml:50:25-92
+114            </intent-filter>
+115        </receiver>
+116    </application>
+117
+118</manifest>

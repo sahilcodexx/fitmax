@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.fixmax.core.DspAndDetectionTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-15T09:15:25.825Z" hostname="codex" time="0.051">
+  <properties/>
+  <testcase name="testPeakDetectorIdentifiesPeaksWithProminence" classname="com.fixmax.core.DspAndDetectionTest" time="0.004"/>
+  <testcase name="testGravityFilterRemovesStaticComponent" classname="com.fixmax.core.DspAndDetectionTest" time="0.011"/>
+  <testcase name="testMagnitudeCalculation" classname="com.fixmax.core.DspAndDetectionTest" time="0.001"/>
+  <testcase name="testAutocorrelationDetectsWalkingCadence" classname="com.fixmax.core.DspAndDetectionTest" time="0.006"/>
+  <testcase name="testFalseStepRejectionVehicleVibration" classname="com.fixmax.core.DspAndDetectionTest" time="0.003"/>
+  <testcase name="testCadenceAnalyzer" classname="com.fixmax.core.DspAndDetectionTest" time="0.022"/>
+  <testcase name="testSignalFilterBandpass" classname="com.fixmax.core.DspAndDetectionTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
