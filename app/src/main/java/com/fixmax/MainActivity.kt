@@ -20,21 +20,29 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.compose.*
-import com.fixmax.feature.dashboard.DashboardScreen
+import com.fixmax.feature.dashboard.WellnessDashboardScreen
 import com.fixmax.feature.hardwarelab.HardwareLabScreen
 import com.fixmax.feature.recorder.RecorderScreen
 import com.fixmax.feature.sensorlab.SensorLabScreen
 import com.fixmax.tracking.StepTrackingService
 import com.fixmax.ui.navigation.Screen
-import com.fixmax.ui.theme.FixMaxTheme
+import com.fixmax.ui.theme.FixMaxWellnessTheme
+import com.fixmax.ui.theme.MintBackground
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = android.graphics.Color.rgb(245, 251, 248)
+        window.navigationBarColor = android.graphics.Color.rgb(245, 251, 248)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
+        }
         setContent {
-            FixMaxTheme {
+            FixMaxWellnessTheme {
                 MainAppScaffold()
             }
         }
@@ -45,9 +53,10 @@ class MainActivity : ComponentActivity() {
 fun MainAppScaffold() {
     val context = LocalContext.current
     val navController = rememberNavController()
-    val items = listOf(Screen.Dashboard, Screen.SensorLab, Screen.Recorder, Screen.HardwareLab)
+    var showDevTabs by remember { mutableStateOf(false) }
+    var showIntro by remember { mutableStateOf(!context.getSharedPreferences("fitmax", 0).getBoolean("intro_seen", false)) }
 
-    // Check runtime permissions
+    // Runtime permissions handling
     var hasActivityPermission by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -78,7 +87,8 @@ fun MainAppScaffold() {
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(showIntro) {
+        if (showIntro) return@LaunchedEffect
         val toRequest = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasActivityPermission) {
             toRequest.add(Manifest.permission.ACTIVITY_RECOGNITION)
@@ -93,80 +103,13 @@ fun MainAppScaffold() {
         }
     }
 
-    Scaffold(
-        topBar = {
-            if (!hasActivityPermission || !hasNotificationPermission) {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Motion permissions required for background tracking",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Button(
-                            onClick = {
-                                val toRequest = mutableListOf<String>()
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasActivityPermission) {
-                                    toRequest.add(Manifest.permission.ACTIVITY_RECOGNITION)
-                                }
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
-                                    toRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-                                }
-                                permissionLauncher.launch(toRequest.toTypedArray())
-                            },
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                        ) {
-                            Text("Grant", fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-        },
-        bottomBar = {
-            NavigationBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentRoute = navBackStackEntry?.destination?.route
-                items.forEach { screen ->
-                    NavigationBarItem(
-                        icon = {
-                            when (screen) {
-                                Screen.Dashboard -> Icon(Icons.Default.DirectionsWalk, contentDescription = null)
-                                Screen.SensorLab -> Icon(Icons.Default.Speed, contentDescription = null)
-                                Screen.Recorder -> Icon(Icons.Default.FiberManualRecord, contentDescription = null)
-                                Screen.HardwareLab -> Icon(Icons.Default.Memory, contentDescription = null)
-                            }
-                        },
-                        label = { Text(screen.title) },
-                        selected = currentRoute == screen.route,
-                        onClick = {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    )
-                }
-            }
+    if (showIntro) {
+        com.fixmax.feature.onboarding.IntroScreen {
+            context.getSharedPreferences("fitmax", 0).edit().putBoolean("intro_seen", true).apply()
+            showIntro = false
         }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Dashboard.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(Screen.Dashboard.route) { DashboardScreen() }
-            composable(Screen.SensorLab.route) { SensorLabScreen() }
-            composable(Screen.Recorder.route) { RecorderScreen() }
-            composable(Screen.HardwareLab.route) { HardwareLabScreen() }
-        }
+        return
     }
+
+    com.fixmax.ui.navigation.MainFigmaScaffold()
 }
