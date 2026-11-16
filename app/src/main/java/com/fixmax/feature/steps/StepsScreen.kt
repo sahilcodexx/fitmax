@@ -1,5 +1,7 @@
 package com.fixmax.feature.steps
 
+import android.app.DatePickerDialog
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -14,8 +16,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,20 +34,26 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fixmax.data.repository.HealthMetricsEngine
 import com.fixmax.tracking.StepTrackingService
 import com.fixmax.ui.components.m3BounceClick
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -63,31 +75,31 @@ fun StepsScreen(
     onBack: () -> Unit = {}
 ) {
     val liveSteps by StepTrackingService.liveStepsToday.collectAsState()
-    val baseSteps = if (liveSteps > 0) liveSteps.toInt() else 7842
+    val baseSteps = if (liveSteps > 0) liveSteps else 7842L
 
-    val dateList = remember {
-        listOf(
-            Triple("Sat", "8", 6200),
-            Triple("Sun", "9", 6500),
-            Triple("Mon", "10", 7100),
-            Triple("Tue", "11", 6850),
-            Triple("Wed", "12", baseSteps), // Active Day (Matches Image 1)
-            Triple("Thu", "13", 7420),
-            Triple("Fri", "14", 8200),
-            Triple("Sat", "15", 9400),
-            Triple("Sun", "16", 7900),
-            Triple("Mon", "17", 8300)
-        )
+    // Dynamic 7-day health history
+    val weeklyHistory = remember(baseSteps) {
+        HealthMetricsEngine.generateWeeklyHistory(baseSteps)
     }
 
-    var selectedDayIndex by remember { mutableStateOf(4) } // Index 4 is Wed 12
+    val (weeklyPointsTotal, weeklyPointsPercent) = remember(weeklyHistory) {
+        HealthMetricsEngine.computeWeeklyPoints(weeklyHistory)
+    }
+
+    val dateList = remember(weeklyHistory) {
+        weeklyHistory.map { snapshot ->
+            Triple(snapshot.dayLabel, snapshot.dateNumber, snapshot.steps.toInt())
+        }
+    }
+
+    var selectedDayIndex by remember { mutableIntStateOf(4) } // Index 4 is Today (Wed 12)
     var selectedMode by remember { mutableStateOf("Activity") } // "Nutrition" or "Activity"
     var showMetricDialog by remember { mutableStateOf<String?>(null) }
 
-    val currentDayData = dateList[selectedDayIndex.coerceIn(dateList.indices)]
+    val currentSnapshot = weeklyHistory[selectedDayIndex.coerceIn(weeklyHistory.indices)]
 
     // Target values for animated counter
-    val targetNumber = if (selectedMode == "Nutrition") 1345 else currentDayData.third
+    val targetNumber = if (selectedMode == "Nutrition") currentSnapshot.caloriesBurned else currentSnapshot.steps.toInt()
 
     // Animated Rolling Counter
     val animatedHeroNumber by animateIntAsState(
@@ -107,6 +119,35 @@ fun StepsScreen(
     val itemSpacingPx = remember(density) { with(density) { 74.dp.toPx() } }
     val itemWidthPx = remember(density) { with(density) { 60.dp.toPx() } }
     val maxDipPx = remember(density) { with(density) { 36.dp.toPx() } }
+
+    val context = LocalContext.current
+    val calendar = remember { Calendar.getInstance() }
+    val datePickerDialog = remember {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val selectedCal = Calendar.getInstance().apply {
+                    set(year, month, dayOfMonth)
+                }
+                val sdfDay = SimpleDateFormat("EEE", Locale.US)
+                val dayStr = sdfDay.format(selectedCal.time)
+                val dayNumStr = dayOfMonth.toString()
+
+                val existingIndex = dateList.indexOfFirst { it.second == dayNumStr }
+                if (existingIndex >= 0) {
+                    coroutineScope.launch {
+                        animIndex.animateTo(existingIndex.toFloat())
+                    }
+                    selectedDayIndex = existingIndex
+                } else {
+                    Toast.makeText(context, "$dayStr, $dayNumStr selected", Toast.LENGTH_SHORT).show()
+                }
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -189,16 +230,21 @@ fun StepsScreen(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
                             ) {
-                                coroutineScope.launch {
-                                    animIndex.animateTo(
-                                        targetValue = index.toFloat(),
-                                        animationSpec = spring(
-                                            dampingRatio = Spring.DampingRatioLowBouncy,
-                                            stiffness = Spring.StiffnessMediumLow
+                                if (isCurrentCenter) {
+                                    // Clicking the centered date (e.g. Wed 12) opens the Calendar UX
+                                    datePickerDialog.show()
+                                } else {
+                                    coroutineScope.launch {
+                                        animIndex.animateTo(
+                                            targetValue = index.toFloat(),
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                stiffness = Spring.StiffnessMediumLow
+                                            )
                                         )
-                                    )
+                                    }
+                                    selectedDayIndex = index
                                 }
-                                selectedDayIndex = index
                             }
                             .padding(vertical = 4.dp)
                     ) {
@@ -328,7 +374,7 @@ fun StepsScreen(
                     )
                 },
                 label = "Distance",
-                value = if (selectedMode == "Activity") "5.8 km" else "6.7 km",
+                value = currentSnapshot.formattedDistance,
                 onClick = { showMetricDialog = "Distance" },
                 modifier = Modifier.weight(1f)
             )
@@ -344,15 +390,35 @@ fun StepsScreen(
                     )
                 },
                 label = "Active Time",
-                value = "1h 12m",
+                value = currentSnapshot.formattedActiveTime,
                 onClick = { showMetricDialog = "Active Time" },
                 modifier = Modifier.weight(1f)
             )
         }
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 5. Image 2: Workout Tasks Grid (Time & Exercises) - Dynamic Math
+        WorkoutTasksGrid(
+            timeHours = currentSnapshot.formattedActiveTime,
+            exerciseTasks = "${(currentSnapshot.activeMinutes / 10).coerceAtLeast(1)}/8",
+            onClickTime = { showMetricDialog = "Workout Time" },
+            onClickExercises = { showMetricDialog = "Completed Tasks" }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 6. Image 2: Weekly Points Card with 64% Ring Badge and Smooth Line Graph - Dynamic Math
+        WeeklyPointsGraphCard(
+            points = weeklyPointsTotal,
+            percentage = weeklyPointsPercent,
+            delta = "+6%",
+            onClick = { showMetricDialog = "Weekly Points" }
+        )
+
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 5. Section Header: "Daily Updates"
+        // 7. Section Header: "Daily Updates"
         Text(
             text = "Daily Updates",
             fontSize = 19.sp,
@@ -362,14 +428,14 @@ fun StepsScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 6. 2-Column Daily Updates Cards (Oxygen & Hart Rate)
+        // 6. 2-Column Daily Updates Cards (Oxygen & Hart Rate) - Dynamic Math
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Oxygen Card
             OxygenUpdateCard(
-                percentage = "84,3 %",
+                percentage = String.format(Locale.US, "%.1f %%", currentSnapshot.oxygenPercent),
                 delta = "+2%",
                 status = "Normal",
                 onClick = { showMetricDialog = "Oxygen" },
@@ -378,7 +444,7 @@ fun StepsScreen(
 
             // Hart Rate Card
             HeartRateUpdateCard(
-                bpm = "102 bpm",
+                bpm = "${currentSnapshot.heartRateBpm} bpm",
                 delta = "-7%",
                 status = "Low",
                 onClick = { showMetricDialog = "Heart Rate" },
@@ -388,10 +454,10 @@ fun StepsScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 7. Health Improvement Score Card (54%, Normal)
+        // 7. Health Improvement Score Card - Dynamic Math
         HealthImprovementScoreCard(
-            score = "54%",
-            status = "Normal",
+            score = "${currentSnapshot.healthScore}%",
+            status = if (currentSnapshot.healthScore >= 75) "Optimal" else "Normal",
             description = "This indicator is based on daily analysis of your physiological markers and provides an objective assessment of your overall wellness and vitality.",
             onClick = { showMetricDialog = "Health Improvement Score" }
         )
@@ -414,30 +480,41 @@ fun StepsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     when (title) {
+                        "Workout Time" -> {
+                            Text("• Total Activity Duration: ${currentSnapshot.formattedActiveTime}", color = Color(0xFF111417), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("• Active Minutes: ${currentSnapshot.activeMinutes} mins", color = Color(0xFF111417), fontSize = 14.sp)
+                            Text("• Target Goal: ${currentSnapshot.goalActiveMinutes} mins", color = Color(0xFF005A43), fontSize = 13.sp)
+                        }
+                        "Completed Tasks" -> {
+                            Text("• Exercises Completed: ${(currentSnapshot.activeMinutes / 10).coerceAtLeast(1)} of 8 tasks", color = Color(0xFF111417), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("• Calories Burned: ${currentSnapshot.caloriesBurned} kcal", color = Color(0xFF2E7D32), fontSize = 13.sp)
+                            Text("• Intensity: Dynamic cardio cadence", color = Color(0xFF6B7280), fontSize = 13.sp)
+                        }
+                        "Weekly Points" -> {
+                            Text("• Weekly Total: ${NumberFormat.getNumberInstance(Locale.US).format(weeklyPointsTotal)} pts (+6% vs last week)", color = Color(0xFF111417), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("• Weekly Goal Progress: $weeklyPointsPercent% completed", color = Color(0xFF2E7D32), fontSize = 13.sp)
+                            Text("• Highest Activity Day: Friday (Peak performance)", color = Color(0xFF3A86A5), fontSize = 13.sp)
+                        }
                         "Distance" -> {
-                            Text("• Measured Stride: 0.74 meters", color = Color(0xFF111417), fontSize = 14.sp)
-                            Text("• Average Pace: 10'48\" per km", color = Color(0xFF111417), fontSize = 14.sp)
-                            Text("• Dynamic Sensor Estimation: Active", color = Color(0xFF005A43), fontSize = 13.sp)
+                            Text("• Total Distance: ${currentSnapshot.formattedDistance}", color = Color(0xFF111417), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("• Steps Logged: ${currentSnapshot.formattedSteps}", color = Color(0xFF111417), fontSize = 14.sp)
+                            Text("• Stride Length: ~0.74 meters", color = Color(0xFF005A43), fontSize = 13.sp)
                         }
                         "Active Time" -> {
-                            Text("• Brisk Walking: 52 minutes", color = Color(0xFF111417), fontSize = 14.sp)
-                            Text("• Moderate Stride: 20 minutes", color = Color(0xFF111417), fontSize = 14.sp)
-                            Text("• Target Milestone: 60 mins (Exceeded!)", color = Color(0xFF005A43), fontSize = 13.sp)
+                            Text("• Total Active Time: ${currentSnapshot.formattedActiveTime}", color = Color(0xFF111417), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("• Progress: ${currentSnapshot.activeMinutes} of ${currentSnapshot.goalActiveMinutes} mins target", color = Color(0xFF005A43), fontSize = 13.sp)
                         }
                         "Oxygen" -> {
-                            Text("• Blood Oxygen (SpO2): 84.3%", color = Color(0xFF111417), fontSize = 14.sp)
-                            Text("• Variance: +2% vs 7-day baseline", color = Color(0xFF005A43), fontSize = 13.sp)
-                            Text("• Status: Normal respiratory rate", color = Color(0xFF6B7280), fontSize = 13.sp)
+                            Text("• Blood Oxygen (SpO2): ${String.format(Locale.US, "%.1f %%", currentSnapshot.oxygenPercent)}", color = Color(0xFF111417), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("• Status: Optimal respiratory circulation", color = Color(0xFF005A43), fontSize = 13.sp)
                         }
                         "Heart Rate" -> {
-                            Text("• Current Heart Rate: 102 bpm", color = Color(0xFF111417), fontSize = 14.sp)
-                            Text("• Resting Rate: 64 bpm", color = Color(0xFF111417), fontSize = 14.sp)
-                            Text("• Training Zone: Fat Burn & Recovery", color = Color(0xFFFF6E53), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("• Current Heart Rate: ${currentSnapshot.heartRateBpm} bpm", color = Color(0xFF111417), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("• Zone: Aerobic & Active Recovery", color = Color(0xFFFF6E53), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                         else -> {
-                            Text("• Composite Score: 54/100", color = Color(0xFF111417), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text("• Factor 1: Regular step consistency", color = Color(0xFF111417), fontSize = 13.sp)
-                            Text("• Factor 2: Steady cardiovascular workload", color = Color(0xFF005A43), fontSize = 13.sp)
+                            Text("• Composite Score: ${currentSnapshot.healthScore}/100", color = Color(0xFF111417), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("• Status: ${if (currentSnapshot.healthScore >= 75) "Optimal Condition" else "Normal Condition"}", color = Color(0xFF005A43), fontSize = 13.sp)
                         }
                     }
                 }
@@ -810,6 +887,343 @@ private fun HealthImprovementScoreCard(
                 color = Color(0xFF8A939D),
                 lineHeight = 16.sp
             )
+        }
+    }
+}
+
+/**
+ * Image 2 Adaptation: Workout Tasks Grid (Time 1:30 & Exercises 12/8)
+ */
+@Composable
+fun WorkoutTasksGrid(
+    modifier: Modifier = Modifier,
+    timeHours: String = "1:30",
+    exerciseTasks: String = "12/8",
+    onClickTime: () -> Unit = {},
+    onClickExercises: () -> Unit = {}
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Time Card (Light Blue)
+        Card(
+            onClick = onClickTime,
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F4FD))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Time",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF14181B)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .background(Color(0xFFD4EAFC), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Schedule,
+                            contentDescription = "Time",
+                            tint = Color(0xFF2A85C8),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = timeHours,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF14181B)
+                )
+                Text(
+                    text = "Hours",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF6B8294)
+                )
+            }
+        }
+
+        // Exercises Card (Light Green)
+        Card(
+            onClick = onClickExercises,
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF7E8))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Exercises",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF14181B)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .background(Color(0xFFD6F2D2), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CheckCircle,
+                            contentDescription = "Exercises",
+                            tint = Color(0xFF43A047),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = exerciseTasks,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF14181B)
+                )
+                Text(
+                    text = "Tasks",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF658A6A)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Image 2 Adaptation: Weekly Points Card with 64% Circular Ring Badge and Smooth Line Graph
+ */
+@Composable
+fun WeeklyPointsGraphCard(
+    modifier: Modifier = Modifier,
+    points: Int = 1544,
+    percentage: Int = 64,
+    delta: String = "+6%",
+    onClick: () -> Unit = {}
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(0.8.dp, Color(0xFFE8ECEF)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            // Top Row: 64% Ring Badge + Weekly points & 1544 score + Three dots menu
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Circular Progress Ring (64%)
+                    Box(
+                        modifier = Modifier.size(54.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val stroke = 5.5.dp.toPx()
+                            // Track
+                            drawArc(
+                                color = Color(0xFFE8ECEF),
+                                startAngle = -90f,
+                                sweepAngle = 360f,
+                                useCenter = false,
+                                style = Stroke(width = stroke, cap = StrokeCap.Round)
+                            )
+                            // Progress Ring (64% lime green)
+                            drawArc(
+                                color = Color(0xFF95BD60),
+                                startAngle = -90f,
+                                sweepAngle = 360f * (percentage / 100f),
+                                useCenter = false,
+                                style = Stroke(width = stroke, cap = StrokeCap.Round)
+                            )
+                        }
+                        Text(
+                            text = "$percentage%",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF14181B)
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = "Weekly points",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF75828D)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = points.toString(),
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF14181B),
+                                letterSpacing = (-0.5).sp
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFFEAF7E8),
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropUp,
+                                        contentDescription = null,
+                                        tint = Color(0xFF2E7D32),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = delta.replace("+", ""),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF2E7D32)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Options",
+                    tint = Color(0xFF8C98A4),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Graph Container: Soft light container with dotted guides, smooth curve, peak dot & S M T W T F S
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFFF7FAFB),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(84.dp)
+                    ) {
+                        val w = size.width
+                        val h = size.height
+                        val daysCount = 7
+                        val stepX = w / (daysCount - 1)
+
+                        // Points for S, M, T, W, T, F, S (Peak at Friday index 5)
+                        val yNorm = listOf(0.28f, 0.24f, 0.36f, 0.32f, 0.22f, 0.88f, 0.62f)
+                        val coords = yNorm.mapIndexed { idx, p ->
+                            Offset(x = idx * stepX, y = h * (1f - p))
+                        }
+
+                        // Dotted vertical grid lines
+                        coords.forEach { pt ->
+                            drawLine(
+                                color = Color(0xFFE0E6EA),
+                                start = Offset(pt.x, 0f),
+                                end = Offset(pt.x, h),
+                                strokeWidth = 1.2.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
+                            )
+                        }
+
+                        // Smooth Cubic Bezier Path
+                        val path = Path().apply {
+                            moveTo(coords[0].x, coords[0].y)
+                            for (i in 0 until coords.size - 1) {
+                                val p0 = coords[i]
+                                val p1 = coords[i + 1]
+                                val cx = (p0.x + p1.x) / 2f
+                                cubicTo(cx, p0.y, cx, p1.y, p1.x, p1.y)
+                            }
+                        }
+
+                        drawPath(
+                            path = path,
+                            color = Color(0xFF3A86A5),
+                            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                        )
+
+                        // Highlight dot on Friday (index 5)
+                        val friPt = coords[5]
+                        drawCircle(color = Color(0xFF3A86A5), radius = 6.dp.toPx(), center = friPt)
+                        drawCircle(color = Color.White, radius = 3.5.dp.toPx(), center = friPt)
+                        drawCircle(color = Color(0xFF14181B), radius = 2.dp.toPx(), center = friPt)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Day labels: S M T W T F S
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        listOf("S", "M", "T", "W", "T", "F", "S").forEachIndexed { index, day ->
+                            Text(
+                                text = day,
+                                fontSize = 11.sp,
+                                fontWeight = if (index == 5) FontWeight.Bold else FontWeight.Medium,
+                                color = if (index == 5) Color(0xFF14181B) else Color(0xFF8C96A0),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.width(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
