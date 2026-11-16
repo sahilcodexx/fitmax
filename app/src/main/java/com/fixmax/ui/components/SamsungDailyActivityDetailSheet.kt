@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.text.NumberFormat
 import java.util.Locale
+import com.fixmax.data.repository.HealthMetricsEngine
 
 data class WeekdayActivityRecord(
     val dayLetter: String,
@@ -52,15 +53,20 @@ fun SamsungDailyActivityDetailSheet(
     val context = LocalContext.current
 
     val weekData = remember(steps, activeMinutes, caloriesBurned) {
-        listOf(
-            WeekdayActivityRecord("S", "Sun, Feb 9", 6420, 42, 260, "1,720 Cal", "4.6 km"),
-            WeekdayActivityRecord("M", "Mon, Feb 10", 8110, 58, 340, "1,910 Cal", "6.1 km"),
-            WeekdayActivityRecord("T", "Tue, Feb 11", 7300, 48, 295, "1,810 Cal", "5.3 km"),
-            WeekdayActivityRecord("W", "Wed, Feb 12", 9250, 64, 410, "2,050 Cal", "7.0 km"),
-            WeekdayActivityRecord("T", "Today (Thu, Feb 13)", steps, activeMinutes, caloriesBurned, "1,850 Cal", "5.8 km", isToday = true),
-            WeekdayActivityRecord("F", "Fri, Feb 14", 4800, 35, 190, "1,550 Cal", "3.6 km"),
-            WeekdayActivityRecord("S", "Sat, Feb 15", 3200, 25, 130, "1,390 Cal", "2.4 km")
-        )
+        val history = HealthMetricsEngine.generateWeeklyHistory(steps.toLong())
+        history.mapIndexed { idx, s ->
+            val isToday = idx == 4
+            WeekdayActivityRecord(
+                dayLetter = s.dayLabel.first().toString(),
+                fullDate = if (isToday) "Today (${s.dayLabel}, Nov ${s.dateNumber})" else "${s.dayLabel}, Nov ${s.dateNumber}",
+                steps = s.steps.toInt(),
+                activeMinutes = s.activeMinutes,
+                caloriesBurned = s.caloriesBurned,
+                totalBurned = "${NumberFormat.getNumberInstance(Locale.US).format(s.caloriesBurned + 1400)} Cal",
+                distance = s.formattedDistance,
+                isToday = isToday
+            )
+        }
     }
 
     var selectedDayIdx by remember { mutableIntStateOf(4) }
