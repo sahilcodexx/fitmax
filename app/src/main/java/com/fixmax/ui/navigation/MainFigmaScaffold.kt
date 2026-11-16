@@ -47,33 +47,35 @@ fun MainFigmaScaffold() {
     val currentRoute = navBackStackEntry?.destination?.route
 
     Scaffold(
-        containerColor = Color(0xFFF7F8FA),
+        containerColor = Color(0xFFF7FCF9),
         bottomBar = {
-            // Unified Floating Island Capsule Navigation Bar (matches Image 1 without separate button)
+            // Samsung Health One UI 7 Compact Floating Island Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(Color(0xFFF7FCF9))
                     .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 10.dp)
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Surface(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp),
-                    shape = RoundedCornerShape(32.dp),
+                        .width(280.dp)
+                        .height(48.dp),
+                    shape = CircleShape,
                     color = Color.White,
-                    shadowElevation = 14.dp,
-                    tonalElevation = 2.dp,
-                    border = BorderStroke(0.6.dp, Color(0xFFE4EBE6))
+                    shadowElevation = 5.dp,
+                    tonalElevation = 0.dp,
+                    border = BorderStroke(0.8.dp, Color(0xFFE2E6EA))
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceAround,
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        listOf(NavTab.Home, NavTab.Stats, NavTab.Workouts, NavTab.Profile).forEach { tab ->
+                        listOf(NavTab.Home, NavTab.Stats, NavTab.Workouts).forEach { tab ->
                             val isSelected = currentRoute == tab.route ||
                                     (tab == NavTab.Stats && (currentRoute == "steps_detail" || currentRoute == "activity_detail"))
 
@@ -81,7 +83,7 @@ fun MainFigmaScaffold() {
                                 NavTab.Home -> Icons.Outlined.Home to Icons.Filled.Home
                                 NavTab.Stats -> Icons.Outlined.Flag to Icons.Filled.Flag
                                 NavTab.Workouts -> Icons.Outlined.CalendarToday to Icons.Filled.CalendarToday
-                                NavTab.Profile -> Icons.Outlined.Person to Icons.Filled.Person
+                                else -> Icons.Outlined.Home to Icons.Filled.Home
                             }
 
                             ExpressiveNavTabItem(
@@ -146,6 +148,13 @@ fun MainFigmaScaffold() {
                             launchSingleTop = true
                             restoreState = true
                         }
+                    },
+                    onNavigateToProfile = {
+                        navController.navigate(NavTab.Profile.route) {
+                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 )
             }
@@ -175,7 +184,11 @@ fun MainFigmaScaffold() {
                 })
             }
             composable(NavTab.Profile.route) {
-                ProfileScreen()
+                ProfileScreen(onBack = {
+                    if (!navController.popBackStack()) {
+                        navController.navigate(NavTab.Home.route)
+                    }
+                })
             }
         }
     }
@@ -183,7 +196,7 @@ fun MainFigmaScaffold() {
 
 /**
  * Material 3 Expressive Animated Navigation Tab Item.
- * Matches Image 1: Active tab is enclosed in a soft gray capsule pill wrapping icon and text.
+ * Active tab is enclosed in a soft harmonious capsule pill wrapping icon and text.
  */
 @Composable
 private fun ExpressiveNavTabItem(
@@ -197,7 +210,7 @@ private fun ExpressiveNavTabItem(
     val interactionSource = remember { MutableInteractionSource() }
 
     val iconScale by animateFloatAsState(
-        targetValue = if (selected) 1.08f else 1.0f,
+        targetValue = if (selected) 1.05f else 1.0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium
@@ -205,25 +218,33 @@ private fun ExpressiveNavTabItem(
         label = "navIconScale"
     )
 
+    // Exact Samsung Health slate silver gray capsule
+    val tabBgColor by animateColorAsState(
+        targetValue = if (selected) Color(0xFFDCE2E6) else Color.Transparent,
+        animationSpec = tween(durationMillis = 180),
+        label = "navTabBgColor"
+    )
+
     val iconColor by animateColorAsState(
-        targetValue = if (selected) Color(0xFF14181F) else Color(0xFF6B7280),
+        targetValue = if (selected) Color(0xFF191C1E) else Color(0xFF40474F),
         animationSpec = tween(durationMillis = 180),
         label = "navIconColor"
     )
 
     val textColor by animateColorAsState(
-        targetValue = if (selected) Color(0xFF14181F) else Color(0xFF6B7280),
+        targetValue = if (selected) Color(0xFF191C1E) else Color(0xFF40474F),
         animationSpec = tween(durationMillis = 180),
         label = "navTextColor"
     )
 
     Box(
         modifier = Modifier
+            .width(68.dp)
+            .height(36.dp)
             .background(
-                color = if (selected) Color(0xFFE2E6E9) else Color.Transparent,
-                shape = RoundedCornerShape(22.dp)
+                color = tabBgColor,
+                shape = CircleShape
             )
-            .padding(horizontal = if (selected) 14.dp else 10.dp, vertical = 6.dp)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -240,27 +261,26 @@ private fun ExpressiveNavTabItem(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = if (selected) selectedIcon else icon,
-                    contentDescription = label,
-                    tint = iconColor,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .graphicsLayer {
-                            scaleX = iconScale
-                            scaleY = iconScale
-                        }
-                )
-            }
+            Icon(
+                imageVector = if (selected) selectedIcon else icon,
+                contentDescription = label,
+                tint = iconColor,
+                modifier = Modifier
+                    .size(18.dp)
+                    .graphicsLayer {
+                        scaleX = iconScale
+                        scaleY = iconScale
+                    }
+            )
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(1.dp))
 
             Text(
                 text = label,
-                fontSize = 11.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = textColor
+                fontSize = 10.5.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                color = textColor,
+                letterSpacing = (-0.2).sp
             )
         }
     }

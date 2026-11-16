@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -23,7 +24,9 @@ import com.fixmax.ui.components.m3BounceClick
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(
+    onBack: () -> Unit = {}
+) {
     val context = LocalContext.current
 
     var userName by remember { mutableStateOf("Sahil") }
@@ -51,8 +54,23 @@ fun ProfileScreen() {
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Top Settings Gear Icon
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        // Top Navigation: Back Arrow & Settings Gear Icon
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.m3BounceClick(onClick = onBack)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color(0xFF1A2E26)
+                )
+            }
+
             IconButton(
                 onClick = { activeSheet = "App Settings" },
                 modifier = Modifier.m3BounceClick { activeSheet = "App Settings" }

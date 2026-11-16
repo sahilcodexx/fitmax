@@ -1,6 +1,11 @@
 package com.fixmax.ui.components
 
+import android.content.Intent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -11,13 +16,27 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.text.NumberFormat
+import java.util.Locale
+
+data class WeekdayActivityRecord(
+    val dayLetter: String,
+    val fullDate: String,
+    val steps: Int,
+    val activeMinutes: Int,
+    val caloriesBurned: Int,
+    val totalBurned: String,
+    val distance: String,
+    val isToday: Boolean = false
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,6 +49,41 @@ fun SamsungDailyActivityDetailSheet(
     activeMinutesGoal: Int = 60,
     caloriesGoal: Int = 500
 ) {
+    val context = LocalContext.current
+
+    val weekData = remember(steps, activeMinutes, caloriesBurned) {
+        listOf(
+            WeekdayActivityRecord("S", "Sun, Feb 9", 6420, 42, 260, "1,720 Cal", "4.6 km"),
+            WeekdayActivityRecord("M", "Mon, Feb 10", 8110, 58, 340, "1,910 Cal", "6.1 km"),
+            WeekdayActivityRecord("T", "Tue, Feb 11", 7300, 48, 295, "1,810 Cal", "5.3 km"),
+            WeekdayActivityRecord("W", "Wed, Feb 12", 9250, 64, 410, "2,050 Cal", "7.0 km"),
+            WeekdayActivityRecord("T", "Today (Thu, Feb 13)", steps, activeMinutes, caloriesBurned, "1,850 Cal", "5.8 km", isToday = true),
+            WeekdayActivityRecord("F", "Fri, Feb 14", 4800, 35, 190, "1,550 Cal", "3.6 km"),
+            WeekdayActivityRecord("S", "Sat, Feb 15", 3200, 25, 130, "1,390 Cal", "2.4 km")
+        )
+    }
+
+    var selectedDayIdx by remember { mutableIntStateOf(4) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val activeRecord = weekData[selectedDayIdx.coerceIn(weekData.indices)]
+
+    val animatedStepsProgress by animateFloatAsState(
+        targetValue = (activeRecord.steps.toFloat() / stepsGoal).coerceIn(0f, 1f),
+        animationSpec = tween(400),
+        label = "stepsProg"
+    )
+    val animatedTimeProgress by animateFloatAsState(
+        targetValue = (activeRecord.activeMinutes.toFloat() / activeMinutesGoal).coerceIn(0f, 1f),
+        animationSpec = tween(400),
+        label = "timeProg"
+    )
+    val animatedCalProgress by animateFloatAsState(
+        targetValue = (activeRecord.caloriesBurned.toFloat() / caloriesGoal).coerceIn(0f, 1f),
+        animationSpec = tween(400),
+        label = "calProg"
+    )
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
@@ -42,7 +96,7 @@ fun SamsungDailyActivityDetailSheet(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Bar: < Today > pill with Close & Share
+            // Top Bar: < Today / Date > pill with Close & Working Calendar / Share Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -54,14 +108,20 @@ fun SamsungDailyActivityDetailSheet(
 
                 Surface(
                     color = Color(0xFFF0F4F2),
-                    shape = RoundedCornerShape(20.dp)
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        selectedDayIdx = 4 // Reset to Today
+                    }
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Today",
+                            text = if (selectedDayIdx == 4) "Today" else activeRecord.fullDate,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF1A2E26)
@@ -69,11 +129,58 @@ fun SamsungDailyActivityDetailSheet(
                     }
                 }
 
-                Row {
-                    IconButton(onClick = {}) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // Working Calendar Button (Opens Date Picker Dialog)
+                    IconButton(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.m3BounceClick { showDatePicker = true }
+                    ) {
                         Icon(Icons.Outlined.CalendarToday, contentDescription = "Calendar", tint = Color(0xFF1A2E26))
                     }
-                    IconButton(onClick = {}) {
+
+                    // Working Share Button (Native Android Share Sheet)
+                    IconButton(
+                        onClick = {
+                            val headerTitle = if (selectedDayIdx == 4) "Today" else activeRecord.fullDate
+                            val shareBody = """
+                                🏃 FitMax Daily Activity Summary ($headerTitle)
+                                👣 Steps: ${NumberFormat.getNumberInstance(Locale.US).format(activeRecord.steps)} / $stepsGoal
+                                ⏱ Active Time: ${activeRecord.activeMinutes} / $activeMinutesGoal mins
+                                🔥 Activity Calories: ${activeRecord.caloriesBurned} / $caloriesGoal Cal
+                                📊 Total Burned: ${activeRecord.totalBurned}
+                                📍 Distance: ${activeRecord.distance}
+                                
+                                Tracked with FitMax on Samsung Galaxy
+                            """.trimIndent()
+
+                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                putExtra(Intent.EXTRA_TEXT, shareBody)
+                                type = "text/plain"
+                            }
+                            val shareIntent = Intent.createChooser(sendIntent, "Share Daily Activity")
+                            context.startActivity(shareIntent)
+                        },
+                        modifier = Modifier.m3BounceClick {
+                            val headerTitle = if (selectedDayIdx == 4) "Today" else activeRecord.fullDate
+                            val shareBody = """
+                                🏃 FitMax Daily Activity Summary ($headerTitle)
+                                👣 Steps: ${NumberFormat.getNumberInstance(Locale.US).format(activeRecord.steps)} / $stepsGoal
+                                ⏱ Active Time: ${activeRecord.activeMinutes} / $activeMinutesGoal mins
+                                🔥 Activity Calories: ${activeRecord.caloriesBurned} / $caloriesGoal Cal
+                                📊 Total Burned: ${activeRecord.totalBurned}
+                                📍 Distance: ${activeRecord.distance}
+                                
+                                Tracked with FitMax on Samsung Galaxy
+                            """.trimIndent()
+
+                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                putExtra(Intent.EXTRA_TEXT, shareBody)
+                                type = "text/plain"
+                            }
+                            val shareIntent = Intent.createChooser(sendIntent, "Share Daily Activity")
+                            context.startActivity(shareIntent)
+                        }
+                    ) {
                         Icon(Icons.Outlined.Share, contentDescription = "Share", tint = Color(0xFF1A2E26))
                     }
                 }
@@ -81,32 +188,41 @@ fun SamsungDailyActivityDetailSheet(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Weekday Strip with Mini Heart Rings (S M T W T F S)
+            // Fully Working Weekday Strip with Mini Concentric Rings (S M T W T F S)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf("S", "M", "T", "W", "T", "F", "S").forEachIndexed { idx, day ->
-                    val isToday = idx == 4 // Thursday or current day
+                weekData.forEachIndexed { idx, item ->
+                    val isSelected = idx == selectedDayIdx
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = if (isToday) Modifier
-                            .background(Color(0xFFE2F5ED), RoundedCornerShape(16.dp))
-                            .padding(horizontal = 8.dp, vertical = 6.dp)
-                        else Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                        modifier = Modifier
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                selectedDayIdx = idx
+                            }
+                            .then(
+                                if (isSelected) Modifier
+                                    .background(Color(0xFFE2F5ED), RoundedCornerShape(16.dp))
+                                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                                else Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                            )
                     ) {
                         Text(
-                            text = day,
-                            fontSize = 11.sp,
-                            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isToday) Color(0xFF005A43) else Color(0xFF7A9388)
+                            text = item.dayLetter,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Color(0xFF005A43) else Color(0xFF7A9388)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         ConcentricActivityRing(
-                            stepsProgress = if (idx <= 4) (0.6f + (idx * 0.08f)).coerceIn(0f, 1f) else 0f,
-                            activeTimeProgress = if (idx <= 4) (0.5f + (idx * 0.1f)).coerceIn(0f, 1f) else 0f,
-                            caloriesProgress = if (idx <= 4) (0.4f + (idx * 0.08f)).coerceIn(0f, 1f) else 0f,
+                            stepsProgress = (item.steps.toFloat() / stepsGoal).coerceIn(0f, 1f),
+                            activeTimeProgress = (item.activeMinutes.toFloat() / activeMinutesGoal).coerceIn(0f, 1f),
+                            caloriesProgress = (item.caloriesBurned.toFloat() / caloriesGoal).coerceIn(0f, 1f),
                             size = 28.dp,
                             strokeWidth = 2.5.dp,
                             ringSpacing = 1.dp
@@ -119,9 +235,9 @@ fun SamsungDailyActivityDetailSheet(
 
             // Centerpiece: 3-Layer Concentric Activity Circle Ring
             ConcentricActivityRing(
-                stepsProgress = steps.toFloat() / stepsGoal,
-                activeTimeProgress = activeMinutes.toFloat() / activeMinutesGoal,
-                caloriesProgress = caloriesBurned.toFloat() / caloriesGoal,
+                stepsProgress = animatedStepsProgress,
+                activeTimeProgress = animatedTimeProgress,
+                caloriesProgress = animatedCalProgress,
                 size = 200.dp,
                 strokeWidth = 14.dp,
                 ringSpacing = 4.dp
@@ -137,21 +253,21 @@ fun SamsungDailyActivityDetailSheet(
                 SamsungMetricPill(
                     title = "Steps",
                     titleColor = Color(0xFF2ECC71),
-                    value = steps.toString(),
+                    value = NumberFormat.getNumberInstance(Locale.US).format(activeRecord.steps),
                     goal = "/$stepsGoal",
                     modifier = Modifier.weight(1f)
                 )
                 SamsungMetricPill(
                     title = "Active time",
                     titleColor = Color(0xFF00B4D8),
-                    value = "$activeMinutes",
+                    value = "${activeRecord.activeMinutes}",
                     goal = "/$activeMinutesGoal mins",
                     modifier = Modifier.weight(1f)
                 )
                 SamsungMetricPill(
                     title = "Activity cal",
                     titleColor = Color(0xFFFF2D75),
-                    value = "$caloriesBurned",
+                    value = "${activeRecord.caloriesBurned}",
                     goal = "/$caloriesGoal Cal",
                     modifier = Modifier.weight(1f)
                 )
@@ -171,7 +287,7 @@ fun SamsungDailyActivityDetailSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(text = "Total burned calories", fontSize = 13.sp, color = Color(0xFF6B867B))
-                Text(text = "1,850 Cal", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A2E26))
+                Text(text = activeRecord.totalBurned, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A2E26))
             }
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -180,10 +296,32 @@ fun SamsungDailyActivityDetailSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(text = "Distance while active", fontSize = 13.sp, color = Color(0xFF6B867B))
-                Text(text = "5.8 km", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A2E26))
+                Text(text = activeRecord.distance, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A2E26))
             }
 
             Spacer(modifier = Modifier.height(34.dp))
+        }
+    }
+
+    // Material 3 Date Picker Dialog
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = System.currentTimeMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Done", color = Color(0xFF005A43), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel", color = Color(0xFF6B867B))
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }

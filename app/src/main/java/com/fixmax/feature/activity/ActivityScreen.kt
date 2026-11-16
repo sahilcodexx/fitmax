@@ -76,71 +76,9 @@ fun ActivityScreen(
             .padding(horizontal = 22.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-        // 1. Top Header: Avatar + "Hello, Sophia" + Circular Floating Notification Button (Image 3)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                // Circular Avatar
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .background(Color(0xFFFFD4C4), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "👩‍🦰",
-                        fontSize = 24.sp
-                    )
-                }
-
-                Text(
-                    text = "Hello, Sophia",
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF14181F)
-                )
-            }
-
-            // Circular White Notification Button with Red Badge Dot
-            Surface(
-                modifier = Modifier
-                    .size(46.dp)
-                    .m3BounceClick { showNotifDialog = true },
-                shape = CircleShape,
-                color = Color.White,
-                shadowElevation = 3.dp
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        imageVector = Icons.Outlined.Notifications,
-                        contentDescription = "Notifications",
-                        tint = Color(0xFF14181F),
-                        modifier = Modifier.size(22.dp)
-                    )
-
-                    // Red Badge Dot
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .background(Color(0xFFE53935), CircleShape)
-                            .align(Alignment.TopEnd)
-                            .offset(x = (-9).dp, y = 9.dp)
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(22.dp))
-
-        // 2. Month Navigator Capsule: ← [ Feb 2025 ] →
+        // 1. Month Navigator Capsule: ← [ Feb 2025 ] → (Top of Workouts Page)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -195,7 +133,7 @@ fun ActivityScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 3. Peach Week Strip (SUN 1, MON 2, TUE 3, WED 4 pill, THR 5, FRI 6, SAT 7)
+        // 2. Peach Week Strip (SUN 1, MON 2, TUE 3, WED 4 pill with generous inner padding, THR 5, FRI 6, SAT 7)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -206,19 +144,21 @@ fun ActivityScreen(
                 val isPastActive = index == 0 || index == 1 // Days 1 & 2 marked active
 
                 if (isSelected) {
-                    // Tall Vertical Salmon Pill for WED 4
+                    // Tall Vertical Salmon Pill for WED 4 with Generous Inner Padding
                     Surface(
-                        shape = RoundedCornerShape(19.dp),
+                        shape = RoundedCornerShape(23.dp),
                         color = Color(0xFFFFC7B2),
                         modifier = Modifier
-                            .width(42.dp)
-                            .height(64.dp)
+                            .width(46.dp)
+                            .height(74.dp)
                             .m3BounceClick { selectedDayIndex = index }
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(vertical = 10.dp, horizontal = 4.dp)
                         ) {
                             Text(
                                 text = dayName,
@@ -226,7 +166,7 @@ fun ActivityScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF14181F)
                             )
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = dateNum,
                                 fontSize = 17.sp,

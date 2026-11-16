@@ -1,7 +1,10 @@
 package com.fixmax.feature.home
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -41,7 +44,8 @@ import java.util.Locale
 @Composable
 fun HomeScreen(
     onNavigateToSteps: () -> Unit = {},
-    onNavigateToActivity: () -> Unit = {}
+    onNavigateToActivity: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {}
 ) {
     val liveSteps by StepTrackingService.liveStepsToday.collectAsState()
     val displaySteps = if (liveSteps > 0) liveSteps else 7842L
@@ -101,48 +105,79 @@ fun HomeScreen(
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
-        // FitMax Header + Notification Bell with Animated Orange Pulse
+        // Top Header: Profile Avatar ("Hello, Sophia" -> opens Profile) + Notifications (Matches Image 2)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "FitMax",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF005A43)
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .m3BounceClick(onClick = onNavigateToProfile)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onNavigateToProfile
+                    )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(Color(0xFFFFD7C2), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "👩‍🦰", fontSize = 24.sp)
+                }
+                Text(
+                    text = "Hello, Sophia",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF101828)
+                )
+            }
 
-            Box {
-                IconButton(
-                    onClick = {
-                        showNotificationSheet = true
-                        hasUnreadNotifications = false
-                    },
-                    modifier = Modifier.m3BounceClick {
+            Surface(
+                modifier = Modifier
+                    .size(44.dp)
+                    .m3BounceClick {
                         showNotificationSheet = true
                         hasUnreadNotifications = false
                     }
-                ) {
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {
+                            showNotificationSheet = true
+                            hasUnreadNotifications = false
+                        }
+                    ),
+                shape = CircleShape,
+                color = Color.White,
+                shadowElevation = 3.dp,
+                border = BorderStroke(0.8.dp, Color(0xFFE8ECEF))
+            ) {
+                Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Outlined.Notifications,
                         contentDescription = "Notifications",
-                        tint = Color(0xFF1A2E26)
+                        tint = Color(0xFF1A2E26),
+                        modifier = Modifier.size(22.dp)
                     )
-                }
-                if (hasUnreadNotifications) {
-                    Box(
-                        modifier = Modifier
-                            .size(9.dp)
-                            .graphicsLayer {
-                                scaleX = notifDotScale
-                                scaleY = notifDotScale
-                            }
-                            .background(Color(0xFFFF6D00), CircleShape)
-                            .align(Alignment.TopEnd)
-                            .offset(x = (-8).dp, y = 8.dp)
-                    )
+                    if (hasUnreadNotifications) {
+                        Box(
+                            modifier = Modifier
+                                .size(9.dp)
+                                .graphicsLayer {
+                                    scaleX = notifDotScale
+                                    scaleY = notifDotScale
+                                }
+                                .background(Color(0xFFFF3B30), CircleShape)
+                                .align(Alignment.TopEnd)
+                                .offset(x = (-8).dp, y = 8.dp)
+                        )
+                    }
                 }
             }
         }
@@ -178,19 +213,9 @@ fun HomeScreen(
             onClick = onNavigateToSteps
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 4. Exercise Quick Launch Bar (Walk, Run, Cycle, Log)
-        SamsungExerciseBar(
-            onWalkClick = onNavigateToSteps,
-            onRunClick = onNavigateToActivity,
-            onCycleClick = onNavigateToActivity,
-            onLogClick = onNavigateToActivity
-        )
-
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 5. Samsung One UI 7 2-Column Grid Cards: Vitals & Cardio Load (Image 2 highlight)
+        // 4. Samsung One UI 7 2-Column Grid Cards: Vitals & Cardio Load (Image 2 highlight)
         Text(
             text = "Health & Vitals",
             fontSize = 17.sp,
@@ -333,7 +358,59 @@ fun HomeScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(130.dp))
+        Spacer(modifier = Modifier.height(26.dp))
+
+        // FitMax Branding Section (Moved to Bottom as Requested in Image 4)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFFDCF4E9),
+                modifier = Modifier.size(46.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.DirectionsRun,
+                        contentDescription = "FitMax",
+                        tint = Color(0xFF005A43),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = "FitMax",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Black,
+                color = Color(0xFF005A43),
+                letterSpacing = (-0.5).sp
+            )
+
+            Spacer(modifier = Modifier.height(3.dp))
+
+            Text(
+                text = "Smart Health & Daily Activity Tracker",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF6B867B)
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Designed for Samsung Galaxy • One UI 7",
+                fontSize = 11.sp,
+                color = Color(0xFF94A8A0)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(48.dp))
     }
 
     // Notifications Bottom Sheet
