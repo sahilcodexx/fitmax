@@ -28,7 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.*
-import com.fixmax.feature.activity.ActivityScreen
 import com.fixmax.feature.home.HomeScreen
 import com.fixmax.feature.profile.ProfileScreen
 import com.fixmax.feature.steps.StepsScreen
@@ -36,7 +35,6 @@ import com.fixmax.feature.steps.StepsScreen
 sealed class NavTab(val route: String, val title: String) {
     object Home : NavTab("home", "Home")
     object Stats : NavTab("stats", "Together")
-    object Workouts : NavTab("workouts", "Workouts")
     object Profile : NavTab("profile", "Profile")
 }
 
@@ -46,72 +44,12 @@ fun MainFigmaScaffold() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    Scaffold(
-        containerColor = Color(0xFFF7FCF9),
-        bottomBar = {
-            // Samsung Health One UI 7 Compact Floating Island Bar
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF7FCF9))
-                    .navigationBarsPadding()
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .width(280.dp)
-                        .height(48.dp),
-                    shape = CircleShape,
-                    color = Color.White,
-                    shadowElevation = 5.dp,
-                    tonalElevation = 0.dp,
-                    border = BorderStroke(0.8.dp, Color(0xFFE2E6EA))
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        listOf(NavTab.Home, NavTab.Stats, NavTab.Workouts).forEach { tab ->
-                            val isSelected = currentRoute == tab.route ||
-                                    (tab == NavTab.Stats && (currentRoute == "steps_detail" || currentRoute == "activity_detail"))
-
-                            val (icon, selectedIcon) = when (tab) {
-                                NavTab.Home -> Icons.Outlined.Home to Icons.Filled.Home
-                                NavTab.Stats -> Icons.Outlined.Flag to Icons.Filled.Flag
-                                NavTab.Workouts -> Icons.Outlined.CalendarToday to Icons.Filled.CalendarToday
-                                else -> Icons.Outlined.Home to Icons.Filled.Home
-                            }
-
-                            ExpressiveNavTabItem(
-                                selected = isSelected,
-                                icon = icon,
-                                selectedIcon = selectedIcon,
-                                label = tab.title,
-                                onClick = {
-                                    navController.navigate(tab.route) {
-                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    ) { paddingValues ->
-        // Screen Content with reserved bottom padding
-        NavHost(
-            navController = navController,
-            startDestination = NavTab.Home.route,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = paddingValues.calculateBottomPadding()),
+    Scaffold(containerColor = Color.Transparent) {
+        Box(Modifier.fillMaxSize()) {
+            NavHost(
+                navController = navController,
+                startDestination = NavTab.Home.route,
+                modifier = Modifier.fillMaxSize(),
             enterTransition = {
                 fadeIn(animationSpec = tween(280)) + slideInHorizontally(
                     animationSpec = tween(280, easing = FastOutSlowInEasing)
@@ -132,7 +70,7 @@ fun MainFigmaScaffold() {
                     animationSpec = tween(220, easing = FastOutSlowInEasing)
                 ) { it / 5 }
             }
-        ) {
+            ) {
             composable(NavTab.Home.route) {
                 HomeScreen(
                     onNavigateToSteps = {
@@ -143,7 +81,7 @@ fun MainFigmaScaffold() {
                         }
                     },
                     onNavigateToActivity = {
-                        navController.navigate(NavTab.Workouts.route) {
+                        navController.navigate(NavTab.Stats.route) {
                             popUpTo(navController.graph.startDestinationId) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
@@ -174,12 +112,17 @@ fun MainFigmaScaffold() {
                     }
                 })
             }
-            composable(NavTab.Workouts.route) {
-                ActivityScreen(onBack = {
-                    navController.navigate(NavTab.Home.route) {
-                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
+            composable("workouts") {
+                StepsScreen(onBack = {
+                    if (!navController.popBackStack()) {
+                        navController.navigate(NavTab.Home.route)
+                    }
+                })
+            }
+            composable("activity_detail") {
+                StepsScreen(onBack = {
+                    if (!navController.popBackStack()) {
+                        navController.navigate(NavTab.Home.route)
                     }
                 })
             }
@@ -190,13 +133,55 @@ fun MainFigmaScaffold() {
                     }
                 })
             }
+            }
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 12.dp)
+                    .width(208.dp)
+                    .height(52.dp),
+                shape = CircleShape,
+                color = Color.White,
+                shadowElevation = 5.dp,
+                tonalElevation = 0.dp,
+                border = BorderStroke(0.8.dp, Color(0xFFE2E6EA))
+            ) {
+                Row(
+                    Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf(NavTab.Home, NavTab.Stats).forEach { tab ->
+                        val isSelected = currentRoute == tab.route ||
+                            (tab == NavTab.Stats && currentRoute in setOf("steps_detail", "activity_detail", "workouts"))
+                        val (icon, selectedIcon) = when (tab) {
+                            NavTab.Home -> Icons.Outlined.Home to Icons.Filled.Home
+                            else -> Icons.Outlined.Flag to Icons.Filled.Flag
+                        }
+                        ExpressiveNavTabItem(
+                            selected = isSelected,
+                            icon = icon,
+                            selectedIcon = selectedIcon,
+                            label = tab.title,
+                            onClick = {
+                                navController.navigate(tab.route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 /**
  * Material 3 Expressive Animated Navigation Tab Item.
- * Active tab is enclosed in a soft harmonious capsule pill wrapping icon and text.
+ * Active tab is enclosed in a soft harmonious capsule pill wrapping icon and text (Samsung Health One UI 7).
  */
 @Composable
 private fun ExpressiveNavTabItem(
@@ -218,29 +203,29 @@ private fun ExpressiveNavTabItem(
         label = "navIconScale"
     )
 
-    // Exact Samsung Health slate silver gray capsule
+    // Exact Samsung Health subtle soft neutral gray capsule
     val tabBgColor by animateColorAsState(
-        targetValue = if (selected) Color(0xFFDCE2E6) else Color.Transparent,
+        targetValue = if (selected) Color(0xFFEBF0F3) else Color.Transparent,
         animationSpec = tween(durationMillis = 180),
         label = "navTabBgColor"
     )
 
     val iconColor by animateColorAsState(
-        targetValue = if (selected) Color(0xFF191C1E) else Color(0xFF40474F),
+        targetValue = if (selected) Color(0xFF191C1E) else Color(0xFF555C65),
         animationSpec = tween(durationMillis = 180),
         label = "navIconColor"
     )
 
     val textColor by animateColorAsState(
-        targetValue = if (selected) Color(0xFF191C1E) else Color(0xFF40474F),
+        targetValue = if (selected) Color(0xFF191C1E) else Color(0xFF555C65),
         animationSpec = tween(durationMillis = 180),
         label = "navTextColor"
     )
 
     Box(
         modifier = Modifier
-            .width(68.dp)
-            .height(36.dp)
+            .width(90.dp)
+            .height(42.dp)
             .background(
                 color = tabBgColor,
                 shape = CircleShape
@@ -266,19 +251,19 @@ private fun ExpressiveNavTabItem(
                 contentDescription = label,
                 tint = iconColor,
                 modifier = Modifier
-                    .size(18.dp)
+                    .size(19.dp)
                     .graphicsLayer {
                         scaleX = iconScale
                         scaleY = iconScale
                     }
             )
 
-            Spacer(modifier = Modifier.height(1.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             Text(
                 text = label,
-                fontSize = 10.5.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                fontSize = 11.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 color = textColor,
                 letterSpacing = (-0.2).sp
             )
