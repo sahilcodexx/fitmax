@@ -1,8 +1,10 @@
 package com.fixmax.feature.home
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -12,7 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,34 +25,23 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fixmax.data.repository.HealthMetricsEngine
 import com.fixmax.tracking.StepTrackingService
-import com.fixmax.ui.components.SamsungActiveTimeCard
-import com.fixmax.ui.components.SamsungActivityTimeline
-import com.fixmax.ui.components.SamsungCaloriesCard
-import com.fixmax.ui.components.SamsungCardioLoadCard
-import com.fixmax.ui.components.SamsungDailyActivityCard
-import com.fixmax.ui.components.SamsungDailyActivityDetailSheet
-import com.fixmax.ui.components.SamsungDistanceCard
-import com.fixmax.ui.components.SamsungExerciseBar
-import com.fixmax.ui.components.SamsungGreenStepGoalCard
-import com.fixmax.ui.components.SamsungStairsCard
-import com.fixmax.ui.components.SamsungVitalsCard
-import com.fixmax.ui.components.SamsungWorkoutHeroCard
-import com.fixmax.ui.components.m3BounceClick
+import com.fixmax.ui.components.*
 import java.text.NumberFormat
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onNavigateToSteps: () -> Unit = {},
-    onNavigateToActivity: () -> Unit = {},
-    onNavigateToProfile: () -> Unit = {}
+    onNavigateToSteps: () -> Unit,
+    onNavigateToActivity: () -> Unit,
+    onNavigateToProfile: () -> Unit
 ) {
     val liveSteps by StepTrackingService.liveStepsToday.collectAsState()
     val displaySteps = if (liveSteps > 0) liveSteps else 7842L
 
-    // Rolling Step Number Counter Animation (0 -> 7,842)
+    // Rolling Step Number Counter Animation (0 -> displaySteps)
     var startCounting by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         startCounting = true
@@ -60,8 +51,10 @@ fun HomeScreen(
         animationSpec = tween(durationMillis = 1300, easing = FastOutSlowInEasing),
         label = "stepsCountRoll"
     )
-    val formattedSteps = remember(animatedSteps) {
-        NumberFormat.getNumberInstance(Locale.US).format(animatedSteps)
+
+    // Dynamic Real Health Math Engine
+    val todaySnapshot = remember(animatedSteps) {
+        HealthMetricsEngine.computeSnapshot(animatedSteps.toLong())
     }
 
     var hasUnreadNotifications by remember { mutableStateOf(true) }
@@ -105,7 +98,7 @@ fun HomeScreen(
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Top Header: Profile Avatar ("Hello, Sophia" -> opens Profile) + Notifications (Matches Image 2)
+        // Top Header: Profile Avatar ("Hello, Sophia" -> opens Profile) + Notifications
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -138,7 +131,8 @@ fun HomeScreen(
                 )
             }
 
-            Surface(
+            // Notification Bell Button with unclipped badge
+            Box(
                 modifier = Modifier
                     .size(44.dp)
                     .m3BounceClick {
@@ -152,70 +146,76 @@ fun HomeScreen(
                             showNotificationSheet = true
                             hasUnreadNotifications = false
                         }
-                    ),
-                shape = CircleShape,
-                color = Color.White,
-                shadowElevation = 3.dp,
-                border = BorderStroke(0.8.dp, Color(0xFFE8ECEF))
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Outlined.Notifications,
-                        contentDescription = "Notifications",
-                        tint = Color(0xFF1A2E26),
-                        modifier = Modifier.size(22.dp)
                     )
-                    if (hasUnreadNotifications) {
-                        Box(
-                            modifier = Modifier
-                                .size(9.dp)
-                                .graphicsLayer {
-                                    scaleX = notifDotScale
-                                    scaleY = notifDotScale
-                                }
-                                .background(Color(0xFFFF3B30), CircleShape)
-                                .align(Alignment.TopEnd)
-                                .offset(x = (-8).dp, y = 8.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    shape = CircleShape,
+                    color = Color.White,
+                    shadowElevation = 3.dp,
+                    border = BorderStroke(0.8.dp, Color(0xFFE8ECEF))
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.Notifications,
+                            contentDescription = "Notifications",
+                            tint = Color(0xFF1A2E26),
+                            modifier = Modifier.size(22.dp)
                         )
                     }
+                }
+
+                if (hasUnreadNotifications) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 3.dp, end = 3.dp)
+                            .size(10.dp)
+                            .graphicsLayer {
+                                scaleX = notifDotScale
+                                scaleY = notifDotScale
+                            }
+                            .background(Color(0xFFFF3B30), CircleShape)
+                            .border(1.5.dp, Color.White, CircleShape)
+                    )
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 1. Samsung Health Orange Active Workout Hero Card (Image 1 top highlight)
+        // 1. Samsung Health Orange Active Workout Hero Card (Image 1 top highlight) - Dynamic Math
         SamsungWorkoutHeroCard(
-            distanceKm = "7.96",
+            distanceKm = String.format(Locale.US, "%.2f", todaySnapshot.distanceKm),
             activityType = "Walking",
-            duration = "1:41:05",
-            steps = 10416,
-            caloriesBurned = 568,
+            duration = todaySnapshot.formattedActiveTime,
+            steps = todaySnapshot.steps.toInt(),
+            caloriesBurned = todaySnapshot.caloriesBurned,
             onClick = onNavigateToActivity
         )
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 2. Samsung Daily Activity Card (3-Layer Concentric Circle Bar + Live Steps, Active Time, Calories)
+        // 2. Samsung Daily Activity Card (3-Layer Concentric Circle Bar + Live Steps, Active Time, Calories) - Dynamic Math
         SamsungDailyActivityCard(
-            steps = animatedSteps,
-            activeMinutes = 54,
-            caloriesBurned = 320,
+            steps = todaySnapshot.steps.toInt(),
+            activeMinutes = todaySnapshot.activeMinutes,
+            caloriesBurned = todaySnapshot.caloriesBurned,
             onClick = { showDailyActivitySheet = true }
         )
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 3. Samsung Vivid Green Step Goal Progress Card (Image 1 bottom highlight)
+        // 3. Samsung Vivid Green Step Goal Progress Card - Dynamic Math
         SamsungGreenStepGoalCard(
-            currentSteps = if (animatedSteps > 0) animatedSteps else 10980,
-            goalSteps = 10000,
+            currentSteps = todaySnapshot.steps.toInt(),
+            goalSteps = todaySnapshot.goalSteps.toInt(),
             onClick = onNavigateToSteps
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 4. Samsung One UI 7 2-Column Grid Cards: Vitals & Cardio Load (Image 2 highlight)
+        // 4. Samsung One UI 7 2-Column Grid Cards: Vitals & Cardio Load - Dynamic Math
         Text(
             text = "Health & Vitals",
             fontSize = 17.sp,
@@ -230,13 +230,13 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             SamsungVitalsCard(
-                sleepScore = "94 Good",
+                sleepScore = todaySnapshot.sleepScore,
                 subtitle = "Track your sleep to measure vitals.",
                 onClick = { selectedStatDetail = "Vitals" },
                 modifier = Modifier.weight(1f)
             )
             SamsungCardioLoadCard(
-                status = "Optimal",
+                status = todaySnapshot.cardioLoad,
                 subtitle = "Find your daily training sweet spot.",
                 onClick = { selectedStatDetail = "Cardio Load" },
                 modifier = Modifier.weight(1f)
@@ -273,17 +273,17 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Quick Stats 2x2 Grid (Rich One UI 7 Health Cards)
+        // Quick Stats 2x2 Grid (Rich One UI 7 Health Cards) - Dynamic Math
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SamsungCaloriesCard(
-                calories = "320",
+                calories = todaySnapshot.caloriesBurned.toString(),
                 subtitle = "Active burn on track",
                 onClick = { selectedStatDetail = "Calories" },
                 modifier = Modifier.weight(1f)
             )
             SamsungActiveTimeCard(
-                minutes = "54",
-                subtitle = "6m left to daily goal",
+                minutes = todaySnapshot.activeMinutes.toString(),
+                subtitle = "${(60 - todaySnapshot.activeMinutes).coerceAtLeast(0)}m left to daily goal",
                 onClick = { selectedStatDetail = "Active Time" },
                 modifier = Modifier.weight(1f)
             )
@@ -293,14 +293,14 @@ fun HomeScreen(
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SamsungDistanceCard(
-                distance = "5.8",
-                subtitle = "7,842 steps covered",
+                distance = String.format(Locale.US, "%.1f", todaySnapshot.distanceKm),
+                subtitle = "${todaySnapshot.formattedSteps} steps covered",
                 onClick = { selectedStatDetail = "Distance" },
                 modifier = Modifier.weight(1f)
             )
             SamsungStairsCard(
-                floors = "12",
-                subtitle = "Elevation ~36 meters",
+                floors = todaySnapshot.floors.toString(),
+                subtitle = "Elevation ~${todaySnapshot.floors * 3} meters",
                 onClick = { selectedStatDetail = "Stairs" },
                 modifier = Modifier.weight(1f)
             )
@@ -360,7 +360,7 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(26.dp))
 
-        // FitMax Branding Section (Moved to Bottom as Requested in Image 4)
+        // FitMax Branding Section
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -410,7 +410,7 @@ fun HomeScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(96.dp))
     }
 
     // Notifications Bottom Sheet
@@ -437,139 +437,94 @@ fun HomeScreen(
                         color = Color(0xFF1A2E26)
                     )
                     TextButton(onClick = { showNotificationSheet = false }) {
-                        Text("Clear All", color = Color(0xFF005A43), fontWeight = FontWeight.SemiBold)
+                        Text("Done", color = Color(0xFF005A43), fontWeight = FontWeight.Bold)
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-
-                NotificationItem(
-                    title = "🎉 Daily Goal Accomplished!",
-                    desc = "You crushed your 10,000 steps goal yesterday with 10,420 steps.",
-                    time = "Yesterday"
-                )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color(0xFFF0F5F2))
-                NotificationItem(
-                    title = "🔥 3-Day Walking Streak",
-                    desc = "You have stayed active 3 days in a row. Keep the rhythm going!",
-                    time = "Today 08:30 AM"
-                )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color(0xFFF0F5F2))
-                NotificationItem(
-                    title = "⚡ Samsung Sensor Hub Active",
-                    desc = "Hardware pedometer is actively tracking steps in the background.",
-                    time = "Active now"
-                )
+                NotificationItem("🎯 Milestone Reached", "You've crushed today's step goal! Keep going strong.", "10m ago")
+                NotificationItem("💧 Hydration Reminder", "Time to drink a glass of water to keep your body optimized.", "45m ago")
+                NotificationItem("🏃 Quick Cardio", "Sophia completed a 5.8 km run. Tap to congratulate!", "2h ago")
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
 
-    // Quick Stat Detail Dialog
+    // Samsung Daily Activity Detail Modal Sheet
+    if (showDailyActivitySheet) {
+        SamsungDailyActivityDetailSheet(
+            onDismiss = { showDailyActivitySheet = false },
+            steps = todaySnapshot.steps.toInt(),
+            activeMinutes = todaySnapshot.activeMinutes,
+            caloriesBurned = todaySnapshot.caloriesBurned,
+            stepsGoal = todaySnapshot.goalSteps.toInt(),
+            activeMinutesGoal = todaySnapshot.goalActiveMinutes,
+            caloriesGoal = todaySnapshot.goalCalories
+        )
+    }
+
+    // Quick Stats Detail Dialog
     selectedStatDetail?.let { statName ->
         AlertDialog(
             onDismissRequest = { selectedStatDetail = null },
             confirmButton = {
                 TextButton(onClick = { selectedStatDetail = null }) {
-                    Text("Close", color = Color(0xFF005A43), fontWeight = FontWeight.Bold)
+                    Text("Got it", color = Color(0xFF005A43), fontWeight = FontWeight.Bold)
                 }
             },
             title = {
-                Text(text = "$statName Breakdown", fontWeight = FontWeight.Bold, color = Color(0xFF1A2E26))
+                Text(text = "$statName Insights", fontWeight = FontWeight.Bold, color = Color(0xFF1A2E26))
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    when (statName) {
-                        "Vitals" -> {
-                            Text("• Sleep Score: 94 Good", color = Color(0xFF1A2E26), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text("• Resting Heart Rate: 62 bpm (Optimal)", color = Color(0xFF0097A7), fontSize = 13.sp)
-                            Text("• Blood Oxygen (SpO2): 98%", color = Color(0xFF1A2E26), fontSize = 13.sp)
-                            Text("• Skin Temperature: Normal (+0.1°C)", color = Color(0xFF6B867B), fontSize = 13.sp)
-                        }
-                        "Cardio Load" -> {
-                            Text("• Training Sweet Spot: Optimal", color = Color(0xFF1A2E26), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text("• 7-Day Training Load: 420 (Balanced)", color = Color(0xFF1E88E5), fontSize = 13.sp)
-                            Text("• Cardio Recovery Remaining: 14 hrs", color = Color(0xFF1A2E26), fontSize = 13.sp)
-                            Text("• Risk Level: Minimal injury risk", color = Color(0xFF005A43), fontSize = 13.sp)
-                        }
-                        "Calories" -> {
-                            Text("• Active Burn: 245 kcal", color = Color(0xFF1A2E26), fontSize = 14.sp)
-                            Text("• Basal Metabolic Rate: 75 kcal", color = Color(0xFF6B867B), fontSize = 13.sp)
-                            Text("• Daily Calorie Goal: 450 kcal (71% reached)", color = Color(0xFF005A43), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        }
-                        "Active Time" -> {
-                            Text("• Brisk Walking: 38 min", color = Color(0xFF1A2E26), fontSize = 14.sp)
-                            Text("• Light Activity: 16 min", color = Color(0xFF6B867B), fontSize = 13.sp)
-                            Text("• Target: 60 minutes per day", color = Color(0xFF005A43), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        }
-                        "Distance" -> {
-                            Text("• Step Stride Length: 0.74 m", color = Color(0xFF1A2E26), fontSize = 14.sp)
-                            Text("• Measured Distance: 5.8 km", color = Color(0xFF1A2E26), fontSize = 14.sp)
-                            Text("• High precision GPS-free sensor estimation", color = Color(0xFF005A43), fontSize = 13.sp)
-                        }
-                        "Stairs" -> {
-                            Text("• Floors Climbed: 12 floors", color = Color(0xFF1A2E26), fontSize = 14.sp)
-                            Text("• Elevation Gain: ~36 meters", color = Color(0xFF6B867B), fontSize = 13.sp)
-                        }
-                    }
-                }
+                Text(
+                    text = when (statName) {
+                        "Calories" -> "You've burned ${todaySnapshot.caloriesBurned} kcal actively today. Metabolic efficiency is steady."
+                        "Active Time" -> "You have logged ${todaySnapshot.activeMinutes} minutes of brisk activity today. ${todaySnapshot.goalActiveMinutes - todaySnapshot.activeMinutes}m remaining to reach your daily 60m target."
+                        "Distance" -> "You've walked and run a total of ${todaySnapshot.formattedDistance} across ${todaySnapshot.formattedSteps} steps."
+                        "Stairs" -> "You have climbed ${todaySnapshot.floors} floors (approximately ${todaySnapshot.floors * 3} vertical meters)."
+                        "Vitals" -> "Sleep quality score is ${todaySnapshot.sleepScore}. Resting heart rate averages ${todaySnapshot.heartRateBpm} bpm."
+                        "Cardio Load" -> "Cardio load status is currently ${todaySnapshot.cardioLoad} based on your training cadence."
+                        else -> "Keep staying active to maintain peak physical and cognitive condition."
+                    },
+                    fontSize = 14.sp,
+                    color = Color(0xFF4A5568)
+                )
             },
             containerColor = Color.White,
             shape = RoundedCornerShape(24.dp)
         )
     }
 
-    // Streak Celebration Dialog
+    // Streak Celebratory Dialog
     if (showStreakDialog) {
         AlertDialog(
             onDismissRequest = { showStreakDialog = false },
             confirmButton = {
-                Button(
-                    onClick = { showStreakDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF005A43)),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Text("Keep Moving!")
+                TextButton(onClick = { showStreakDialog = false }) {
+                    Text("Awesome!", color = Color(0xFF005A43), fontWeight = FontWeight.Bold)
                 }
             },
             title = {
-                Text(text = "🏆 3-Day Walking Streak!", fontWeight = FontWeight.Bold, color = Color(0xFF1A2E26))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("🏆", fontSize = 24.sp)
+                    Text("3-Day Streak!", fontWeight = FontWeight.Bold, color = Color(0xFF1A2E26))
+                }
             },
             text = {
-                Column {
-                    Text(
-                        text = "Great dedication, Sahil! You have achieved your daily step goal 3 days in a row.",
-                        color = Color(0xFF1A2E26),
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Next milestone: 7-day Bronze Medalist Badge (4 days to go).",
-                        color = Color(0xFF005A43),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                Text(
+                    text = "You've reached your daily movement goal 3 days in a row! Maintain momentum to unlock the 7-day Master Streak badge.",
+                    fontSize = 14.sp,
+                    color = Color(0xFF4A5568)
+                )
             },
             containerColor = Color.White,
             shape = RoundedCornerShape(24.dp)
-        )
-    }
-
-    // Samsung Daily Activity Detail Sheet (Full Heart Ribbon + Weekday Strip + 24h Timeline)
-    if (showDailyActivitySheet) {
-        SamsungDailyActivityDetailSheet(
-            onDismiss = { showDailyActivitySheet = false },
-            steps = animatedSteps,
-            activeMinutes = 54,
-            caloriesBurned = 320
         )
     }
 }
 
 @Composable
 private fun NotificationItem(title: String, desc: String, time: String) {
-    Column {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Text(text = title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A2E26))
         Spacer(modifier = Modifier.height(2.dp))
         Text(text = desc, fontSize = 12.sp, color = Color(0xFF6B867B), lineHeight = 16.sp)
