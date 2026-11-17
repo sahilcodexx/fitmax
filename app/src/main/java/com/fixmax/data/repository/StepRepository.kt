@@ -11,7 +11,11 @@ class StepRepository(private val db: FixMaxDatabase) {
 
     fun observeToday(dateStr: String): Flow<DailySummaryEntity?> = db.dailySummaryDao().observeDailySummary(dateStr)
 
-    suspend fun addSteps(dateStr: String, delta: Long, stepLengthMeters: Float = 0.74f) {
+    suspend fun addSteps(dateStr: String, delta: Long, stepLengthMeters: Float = 0.832f) {
         db.dailySummaryDao().incrementDailySteps(dateStr, delta, stepLengthMeters, System.currentTimeMillis())
+    }
+
+    suspend fun setTodaySteps(dateStr: String, steps: Long, stepLengthMeters: Float = 0.832f) {
+        db.dailySummaryDao().setDailySteps(dateStr, steps, stepLengthMeters, System.currentTimeMillis())
     }
 }

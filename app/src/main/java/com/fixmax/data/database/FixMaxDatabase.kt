@@ -66,6 +66,18 @@ interface DailySummaryDao {
             insertOrUpdate(current.copy(totalSteps = total, distanceMeters = total * stepLengthMeters, lastUpdatedMs = timestampMs))
         }
     }
+
+    @Transaction
+    suspend fun setDailySteps(date: String, steps: Long, stepLengthMeters: Float = 0.832f, timestampMs: Long) {
+        val current = getDailySummary(date)
+        val distance = steps * stepLengthMeters
+        val activeMins = (steps / 110f).toInt()
+        if (current == null) {
+            insertOrUpdate(DailySummaryEntity(date, steps, distance, activeMins, 10_000L, timestampMs))
+        } else {
+            insertOrUpdate(current.copy(totalSteps = steps, distanceMeters = distance, activeMinutes = activeMins, lastUpdatedMs = timestampMs))
+        }
+    }
 }
 
 @Database(entities = [DeviceProfileEntity::class, SensorCheckpointEntity::class, DailySummaryEntity::class], version = 1, exportSchema = false)
