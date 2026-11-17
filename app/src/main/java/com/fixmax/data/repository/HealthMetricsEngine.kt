@@ -2,6 +2,8 @@ package com.fixmax.data.repository
 
 import com.fixmax.tracking.StepTrackingService
 import kotlinx.coroutines.flow.StateFlow
+import java.time.LocalDate
+import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -9,16 +11,16 @@ data class DailyHealthSnapshot(
     val dayLabel: String,         // "Mon", "Tue", "Wed"
     val dateNumber: String,       // "10", "11", "12"
     val fullDateStr: String,      // "2026-11-12"
-    val steps: Long,              // e.g. 7842
+    val steps: Long,              // e.g. 1947
     val goalSteps: Long = 10000L,
-    val distanceKm: Float,        // e.g. 5.8f
-    val caloriesBurned: Int,      // e.g. 320
-    val activeMinutes: Int,       // e.g. 54
+    val distanceKm: Float,        // e.g. 1.62f
+    val caloriesBurned: Int,      // e.g. 105
+    val activeMinutes: Int,       // e.g. 18
     val goalActiveMinutes: Int = 60,
     val goalCalories: Int = 500,
     val heartRateBpm: Int = 102,
     val oxygenPercent: Float = 98.4f,
-    val floors: Int = 12,
+    val floors: Int = 5,
     val healthScore: Int = 85,
     val sleepScore: String = "94 Good",
     val cardioLoad: String = "Optimal"
@@ -28,15 +30,15 @@ data class DailyHealthSnapshot(
     val caloriesProgress: Float get() = (caloriesBurned.toFloat() / goalCalories.coerceAtLeast(1)).coerceIn(0f, 1.5f)
 
     val formattedSteps: String get() = java.text.NumberFormat.getNumberInstance(Locale.US).format(steps)
-    val formattedDistance: String get() = String.format(Locale.US, "%.1f km", distanceKm)
+    val formattedDistance: String get() = String.format(Locale.US, "%.2f km", distanceKm)
     val formattedActiveTime: String get() = if (activeMinutes >= 60) "${activeMinutes / 60}h ${activeMinutes % 60}m" else "${activeMinutes}m"
 }
 
 object HealthMetricsEngine {
-    // Kinematic & Metabolic Constants
-    const val STRIDE_LENGTH_METERS = 0.74f   // Average human adult stride length
-    const val KCAL_PER_STEP = 0.041f         // Average calories burned per step (70kg adult)
-    const val STEPS_PER_ACTIVE_MINUTE = 110f // ~110 steps/min cadence threshold for active time
+    // Kinematic & Metabolic Constants calibrated to user's NoiseFit watch (1947 steps = 1.62km, 105 kcal)
+    const val STRIDE_LENGTH_METERS = 0.832f   // Adult stride length: 1947 steps = 1.62 km
+    const val KCAL_PER_STEP = 0.054f         // Caloric burn rate: 1947 steps = 105 kcal
+    const val STEPS_PER_ACTIVE_MINUTE = 110f // ~110 steps/min cadence threshold for brisk active time
     const val STEPS_PER_FLOOR = 350L         // ~350 steps ≈ 1 floor elevation equivalent
 
     /**
@@ -45,8 +47,8 @@ object HealthMetricsEngine {
     fun computeSnapshot(
         steps: Long,
         dayLabel: String = "Wed",
-        dateNumber: String = "12",
-        fullDateStr: String = "2026-11-12",
+        dateNumber: String = "18",
+        fullDateStr: String = "2026-11-18",
         goalSteps: Long = 10000L,
         strideLength: Float = STRIDE_LENGTH_METERS,
         weightKg: Float = 68f
@@ -100,32 +102,60 @@ object HealthMetricsEngine {
         )
     }
 
+    const val PAST_DAYS_COUNT = 30
+    const val FUTURE_DAYS_COUNT = 14
+    const val TODAY_INDEX = 30
+
     /**
-     * Generate dynamic 7-day history leading up to today.
-     * The active day (Wed 12) tracks the live steps, while surrounding days have realistic, dynamic variations.
+     * Generate dynamic full date history centered on referenceDate (Today at index 30).
+     * Includes past 30 days and next 14 days (45 days total) so user can scroll across all dates.
      */
-    fun generateWeeklyHistory(liveTodaySteps: Long): List<DailyHealthSnapshot> {
-        val todaySteps = if (liveTodaySteps > 0) liveTodaySteps else 7842L
+    fun generateWeeklyHistory(liveTodaySteps: Long, referenceDate: LocalDate = LocalDate.now()): List<DailyHealthSnapshot> {
+        val todaySteps = if (liveTodaySteps > 0) liveTodaySteps else 1947L
 
-        val stepDeltas = listOf(6200L, 6500L, 7100L, 6850L, todaySteps, 7420L, 8200L)
-        val dayNames = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
-        val dateNums = listOf("8", "9", "10", "11", "12", "13", "14")
+        val offsets = (-PAST_DAYS_COUNT..FUTURE_DAYS_COUNT).toList()
 
-        return stepDeltas.mapIndexed { i, steps ->
+        return offsets.map { offset ->
+            val date = referenceDate.plusDays(offset.toLong())
+            val dayLabel = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.US)
+            val dateNum = date.dayOfMonth.toString()
+            val fullDateStr = date.toString()
+
+            val stepsForDay = when {
+                offset == 0 -> todaySteps
+                offset < 0 -> {
+                    // Seeded realistic past steps between 1200 and 2420
+                    val seed = kotlin.math.abs((date.dayOfMonth * 19 + date.monthValue * 37) % 7)
+                    when (seed) {
+                        0 -> 1850L
+                        1 -> 2120L
+                        2 -> 1680L
+                        3 -> 1940L
+                        4 -> 1760L
+                        5 -> 2250L
+                        else -> 1520L
+                    }
+                }
+                else -> 0L // Future days have 0 steps
+            }
+
             computeSnapshot(
-                steps = steps,
-                dayLabel = dayNames[i],
-                dateNumber = dateNums[i],
-                fullDateStr = "2026-11-${dateNums[i]}"
+                steps = stepsForDay,
+                dayLabel = dayLabel,
+                dateNumber = dateNum,
+                fullDateStr = fullDateStr
             )
         }
     }
 
     /**
-     * Compute weekly points and progress percentage from 7-day history.
+     * Compute weekly points and progress percentage for the 7-day rolling window.
      */
-    fun computeWeeklyPoints(history: List<DailyHealthSnapshot>): Pair<Int, Int> {
-        val totalPoints = history.sumOf { snapshot ->
+    fun computeWeeklyPoints(history: List<DailyHealthSnapshot>, selectedIndex: Int = -1): Pair<Int, Int> {
+        val targetIndex = if (selectedIndex in history.indices) selectedIndex else TODAY_INDEX.coerceIn(history.indices)
+        val startIndex = (targetIndex - 6).coerceAtLeast(0)
+        val slice = history.subList(startIndex, (targetIndex + 1).coerceAtMost(history.size))
+        val totalPoints = slice.filter { it.steps > 0 }.sumOf { snapshot ->
             (snapshot.steps / 10L) + (snapshot.activeMinutes * 5L) + (snapshot.caloriesBurned / 2L)
         }.toInt()
         val weeklyTarget = 2400
