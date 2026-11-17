@@ -1,6 +1,5 @@
 package com.fixmax.feature.steps
 
-import android.app.DatePickerDialog
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -49,11 +48,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fixmax.data.repository.HealthMetricsEngine
 import com.fixmax.tracking.StepTrackingService
+import com.fixmax.ui.components.FitMaxCustomCalendarSheet
 import com.fixmax.ui.components.m3BounceClick
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
-import java.util.Calendar
+import java.time.LocalDate
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -75,15 +74,22 @@ fun StepsScreen(
     onBack: () -> Unit = {}
 ) {
     val liveSteps by StepTrackingService.liveStepsToday.collectAsState()
-    val baseSteps = if (liveSteps > 0) liveSteps else 7842L
+    val baseSteps = if (liveSteps > 0) liveSteps else 1947L
 
-    // Dynamic 7-day health history
-    val weeklyHistory = remember(baseSteps) {
-        HealthMetricsEngine.generateWeeklyHistory(baseSteps)
+    var referenceDate by remember { mutableStateOf(LocalDate.now()) }
+
+    // Dynamic full date history (past 30 days + future 14 days, today at index 30)
+    val weeklyHistory = remember(baseSteps, referenceDate) {
+        HealthMetricsEngine.generateWeeklyHistory(baseSteps, referenceDate)
     }
 
-    val (weeklyPointsTotal, weeklyPointsPercent) = remember(weeklyHistory) {
-        HealthMetricsEngine.computeWeeklyPoints(weeklyHistory)
+    var selectedDayIndex by remember { mutableIntStateOf(HealthMetricsEngine.TODAY_INDEX) }
+    var selectedMode by remember { mutableStateOf("Activity") } // "Nutrition" or "Activity"
+    var showMetricDialog by remember { mutableStateOf<String?>(null) }
+    var showCustomCalendarSheet by remember { mutableStateOf(false) }
+
+    val (weeklyPointsTotal, weeklyPointsPercent) = remember(weeklyHistory, selectedDayIndex) {
+        HealthMetricsEngine.computeWeeklyPoints(weeklyHistory, selectedDayIndex)
     }
 
     val dateList = remember(weeklyHistory) {
@@ -91,10 +97,6 @@ fun StepsScreen(
             Triple(snapshot.dayLabel, snapshot.dateNumber, snapshot.steps.toInt())
         }
     }
-
-    var selectedDayIndex by remember { mutableIntStateOf(4) } // Index 4 is Today (Wed 12)
-    var selectedMode by remember { mutableStateOf("Activity") } // "Nutrition" or "Activity"
-    var showMetricDialog by remember { mutableStateOf<String?>(null) }
 
     val currentSnapshot = weeklyHistory[selectedDayIndex.coerceIn(weeklyHistory.indices)]
 
@@ -113,41 +115,13 @@ fun StepsScreen(
     }
 
     val coroutineScope = rememberCoroutineScope()
-    // Animatable float index for buttery smooth drag & snap (starts at 4f: Wed 12)
-    val animIndex = remember { Animatable(4f) }
+    // Animatable float index for buttery smooth drag & snap (starts at TODAY_INDEX: 30f)
+    val animIndex = remember { Animatable(HealthMetricsEngine.TODAY_INDEX.toFloat()) }
     val density = LocalDensity.current
     val itemSpacingPx = remember(density) { with(density) { 74.dp.toPx() } }
     val itemWidthPx = remember(density) { with(density) { 60.dp.toPx() } }
     val maxDipPx = remember(density) { with(density) { 36.dp.toPx() } }
-
     val context = LocalContext.current
-    val calendar = remember { Calendar.getInstance() }
-    val datePickerDialog = remember {
-        DatePickerDialog(
-            context,
-            { _, year, month, dayOfMonth ->
-                val selectedCal = Calendar.getInstance().apply {
-                    set(year, month, dayOfMonth)
-                }
-                val sdfDay = SimpleDateFormat("EEE", Locale.US)
-                val dayStr = sdfDay.format(selectedCal.time)
-                val dayNumStr = dayOfMonth.toString()
-
-                val existingIndex = dateList.indexOfFirst { it.second == dayNumStr }
-                if (existingIndex >= 0) {
-                    coroutineScope.launch {
-                        animIndex.animateTo(existingIndex.toFloat())
-                    }
-                    selectedDayIndex = existingIndex
-                } else {
-                    Toast.makeText(context, "$dayStr, $dayNumStr selected", Toast.LENGTH_SHORT).show()
-                }
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        )
-    }
 
     Column(
         modifier = Modifier
@@ -231,8 +205,8 @@ fun StepsScreen(
                                 indication = null
                             ) {
                                 if (isCurrentCenter) {
-                                    // Clicking the centered date (e.g. Wed 12) opens the Calendar UX
-                                    datePickerDialog.show()
+                                    // Clicking the centered date opens the custom FitMax Calendar
+                                    showCustomCalendarSheet = true
                                 } else {
                                     coroutineScope.launch {
                                         animIndex.animateTo(
@@ -399,8 +373,10 @@ fun StepsScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // 5. Image 2: Workout Tasks Grid (Time & Exercises) - Dynamic Math
+        val activeMins = currentSnapshot.activeMinutes
+        val formattedTimeHours = String.format(Locale.US, "%d:%02d", activeMins / 60, activeMins % 60)
         WorkoutTasksGrid(
-            timeHours = currentSnapshot.formattedActiveTime,
+            timeHours = formattedTimeHours,
             exerciseTasks = "${(currentSnapshot.activeMinutes / 10).coerceAtLeast(1)}/8",
             onClickTime = { showMetricDialog = "Workout Time" },
             onClickExercises = { showMetricDialog = "Completed Tasks" }
@@ -521,6 +497,42 @@ fun StepsScreen(
             },
             containerColor = Color.White,
             shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    // Custom One UI 7 / FitMax Activity Calendar Modal Bottom Sheet
+    if (showCustomCalendarSheet) {
+        val initialSelected = try {
+            LocalDate.parse(currentSnapshot.fullDateStr)
+        } catch (_: Exception) {
+            LocalDate.now()
+        }
+        FitMaxCustomCalendarSheet(
+            initialDate = initialSelected,
+            onDismiss = { showCustomCalendarSheet = false },
+            onDateSelected = { chosenDate ->
+                val chosenDateStr = chosenDate.toString()
+                val targetIdx = weeklyHistory.indexOfFirst { it.fullDateStr == chosenDateStr }
+                if (targetIdx >= 0) {
+                    coroutineScope.launch {
+                        animIndex.animateTo(
+                            targetValue = targetIdx.toFloat(),
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        )
+                    }
+                    selectedDayIndex = targetIdx
+                } else {
+                    // Chosen date is outside current 45-day window, re-center on it
+                    referenceDate = chosenDate
+                    selectedDayIndex = HealthMetricsEngine.TODAY_INDEX
+                    coroutineScope.launch {
+                        animIndex.snapTo(HealthMetricsEngine.TODAY_INDEX.toFloat())
+                    }
+                }
+            }
         )
     }
 }

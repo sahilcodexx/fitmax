@@ -39,7 +39,7 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit
 ) {
     val liveSteps by StepTrackingService.liveStepsToday.collectAsState()
-    val displaySteps = if (liveSteps > 0) liveSteps else 7842L
+    val displaySteps = if (liveSteps > 0) liveSteps else 1947L
 
     // Rolling Step Number Counter Animation (0 -> displaySteps)
     var startCounting by remember { mutableStateOf(false) }
