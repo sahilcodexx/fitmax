@@ -54,8 +54,11 @@ fun SamsungDailyActivityDetailSheet(
 
     val weekData = remember(steps, activeMinutes, caloriesBurned) {
         val history = HealthMetricsEngine.generateWeeklyHistory(steps.toLong())
-        history.mapIndexed { idx, s ->
-            val isToday = idx == 4
+        val todayIdx = HealthMetricsEngine.TODAY_INDEX
+        val startIndex = (todayIdx - 3).coerceAtLeast(0)
+        val slice = history.subList(startIndex, (startIndex + 7).coerceAtMost(history.size))
+        slice.mapIndexed { idx, s ->
+            val isToday = idx == 3
             WeekdayActivityRecord(
                 dayLetter = s.dayLabel.first().toString(),
                 fullDate = if (isToday) "Today (${s.dayLabel}, Nov ${s.dateNumber})" else "${s.dayLabel}, Nov ${s.dateNumber}",
@@ -69,7 +72,7 @@ fun SamsungDailyActivityDetailSheet(
         }
     }
 
-    var selectedDayIdx by remember { mutableIntStateOf(4) }
+    var selectedDayIdx by remember { mutableIntStateOf(3) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     val activeRecord = weekData[selectedDayIdx.coerceIn(weekData.indices)]
@@ -119,7 +122,7 @@ fun SamsungDailyActivityDetailSheet(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) {
-                        selectedDayIdx = 4 // Reset to Today
+                        selectedDayIdx = 3 // Reset to Today
                     }
                 ) {
                     Row(
@@ -127,7 +130,7 @@ fun SamsungDailyActivityDetailSheet(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (selectedDayIdx == 4) "Today" else activeRecord.fullDate,
+                            text = if (selectedDayIdx == 3) "Today" else activeRecord.fullDate,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF1A2E26)
@@ -309,26 +312,15 @@ fun SamsungDailyActivityDetailSheet(
         }
     }
 
-    // Material 3 Date Picker Dialog
+    // FitMax Custom Calendar Modal Bottom Sheet
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = System.currentTimeMillis()
-        )
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("Done", color = Color(0xFF005A43), fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel", color = Color(0xFF6B867B))
-                }
+        FitMaxCustomCalendarSheet(
+            initialDate = java.time.LocalDate.now(),
+            onDismiss = { showDatePicker = false },
+            onDateSelected = { _ ->
+                showDatePicker = false
             }
-        ) {
-            DatePicker(state = datePickerState)
-        }
+        )
     }
 }
 
