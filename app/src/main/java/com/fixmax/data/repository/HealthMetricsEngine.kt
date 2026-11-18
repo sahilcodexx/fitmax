@@ -10,20 +10,20 @@ import kotlin.math.roundToInt
 data class DailyHealthSnapshot(
     val dayLabel: String,         // "Mon", "Tue", "Wed"
     val dateNumber: String,       // "10", "11", "12"
-    val fullDateStr: String,      // "2026-11-12"
-    val steps: Long,              // e.g. 1947
+    val fullDateStr: String,      // "yyyy-MM-dd"
+    val steps: Long,              // Live real steps
     val goalSteps: Long = 10000L,
-    val distanceKm: Float,        // e.g. 1.62f
-    val caloriesBurned: Int,      // e.g. 105
-    val activeMinutes: Int,       // e.g. 18
+    val distanceKm: Float,        // Real computed distance in km
+    val caloriesBurned: Int,      // Real computed active kcal
+    val activeMinutes: Int,       // Real computed active minutes
     val goalActiveMinutes: Int = 60,
     val goalCalories: Int = 500,
-    val heartRateBpm: Int = 102,
-    val oxygenPercent: Float = 98.4f,
-    val floors: Int = 5,
-    val healthScore: Int = 85,
-    val sleepScore: String = "94 Good",
-    val cardioLoad: String = "Optimal"
+    val heartRateBpm: Int = 68,
+    val oxygenPercent: Float = 98.0f,
+    val floors: Int = 0,
+    val healthScore: Int = 0,
+    val sleepScore: String = "--",
+    val cardioLoad: String = "No Activity"
 ) {
     val stepsProgress: Float get() = (steps.toFloat() / goalSteps.coerceAtLeast(1L)).coerceIn(0f, 1.5f)
     val activeTimeProgress: Float get() = (activeMinutes.toFloat() / goalActiveMinutes.coerceAtLeast(1)).coerceIn(0f, 1.5f)
@@ -35,9 +35,9 @@ data class DailyHealthSnapshot(
 }
 
 object HealthMetricsEngine {
-    // Kinematic & Metabolic Constants calibrated to user's NoiseFit watch (1947 steps = 1.62km, 105 kcal)
-    const val STRIDE_LENGTH_METERS = 0.832f   // Adult stride length: 1947 steps = 1.62 km
-    const val KCAL_PER_STEP = 0.054f         // Caloric burn rate: 1947 steps = 105 kcal
+    // Kinematic & Metabolic Constants (stride length 0.832m, calorie rate 0.054 kcal/step)
+    const val STRIDE_LENGTH_METERS = 0.832f   // Adult stride length
+    const val KCAL_PER_STEP = 0.054f         // Caloric burn rate
     const val STEPS_PER_ACTIVE_MINUTE = 110f // ~110 steps/min cadence threshold for brisk active time
     const val STEPS_PER_FLOOR = 350L         // ~350 steps ≈ 1 floor elevation equivalent
 
@@ -48,7 +48,7 @@ object HealthMetricsEngine {
         steps: Long,
         dayLabel: String = "Wed",
         dateNumber: String = "18",
-        fullDateStr: String = "2026-11-18",
+        fullDateStr: String = LocalDate.now().toString(),
         goalSteps: Long = 10000L,
         strideLength: Float = STRIDE_LENGTH_METERS,
         weightKg: Float = 68f
@@ -57,26 +57,28 @@ object HealthMetricsEngine {
         val distanceKm = (safeSteps * strideLength) / 1000f
         val calories = (safeSteps * KCAL_PER_STEP * (weightKg / 70f)).roundToInt().coerceAtLeast(0)
         val activeMinutes = (safeSteps / STEPS_PER_ACTIVE_MINUTE).roundToInt().coerceAtLeast(0)
-        val floors = (safeSteps / STEPS_PER_FLOOR).toInt().coerceAtLeast(1)
+        val floors = if (safeSteps > 0) (safeSteps / STEPS_PER_FLOOR).toInt().coerceAtLeast(1) else 0
 
         // Dynamic physiological calculations
         val baseBpm = 68
-        val dynamicBpm = (baseBpm + (activeMinutes * 0.48f).coerceAtMost(52f)).roundToInt()
-        val oxygen = (98.2f + (0.4f * kotlin.math.sin(safeSteps.toDouble() / 1200.0).toFloat())).coerceIn(95f, 100f)
+        val dynamicBpm = if (safeSteps > 0) (baseBpm + (activeMinutes * 0.48f).coerceAtMost(52f)).roundToInt() else 68
+        val oxygen = if (safeSteps > 0) (98.2f + (0.4f * kotlin.math.sin(safeSteps.toDouble() / 1200.0).toFloat())).coerceIn(95f, 100f) else 98.0f
 
         // Composite wellness score (0-100%)
         val stepPts = (safeSteps.toFloat() / goalSteps).coerceIn(0f, 1f) * 45f
         val timePts = (activeMinutes.toFloat() / 60f).coerceIn(0f, 1f) * 35f
         val calPts = (calories.toFloat() / 500f).coerceIn(0f, 1f) * 20f
-        val compositeScore = (stepPts + timePts + calPts).roundToInt().coerceIn(10, 100)
+        val compositeScore = if (safeSteps > 0) (stepPts + timePts + calPts).roundToInt().coerceIn(10, 100) else 0
 
         val cardioStatus = when {
+            safeSteps == 0L -> "No Activity"
             activeMinutes >= 50 -> "Optimal"
             activeMinutes >= 25 -> "Maintaining"
             else -> "Low Load"
         }
 
         val sleep = when {
+            safeSteps == 0L -> "--"
             compositeScore >= 80 -> "94 Good"
             compositeScore >= 60 -> "82 Fair"
             else -> "75 Need Rest"
@@ -109,9 +111,14 @@ object HealthMetricsEngine {
     /**
      * Generate dynamic full date history centered on referenceDate (Today at index 30).
      * Includes past 30 days and next 14 days (45 days total) so user can scroll across all dates.
+     * Past days use historyMap (from DB), defaulting to 0 for unrecorded days.
      */
-    fun generateWeeklyHistory(liveTodaySteps: Long, referenceDate: LocalDate = LocalDate.now()): List<DailyHealthSnapshot> {
-        val todaySteps = if (liveTodaySteps > 0) liveTodaySteps else 1947L
+    fun generateWeeklyHistory(
+        liveTodaySteps: Long,
+        referenceDate: LocalDate = LocalDate.now(),
+        historyMap: Map<String, Long> = emptyMap()
+    ): List<DailyHealthSnapshot> {
+        val todaySteps = liveTodaySteps.coerceAtLeast(0L)
 
         val offsets = (-PAST_DAYS_COUNT..FUTURE_DAYS_COUNT).toList()
 
@@ -123,19 +130,7 @@ object HealthMetricsEngine {
 
             val stepsForDay = when {
                 offset == 0 -> todaySteps
-                offset < 0 -> {
-                    // Seeded realistic past steps between 1200 and 2420
-                    val seed = kotlin.math.abs((date.dayOfMonth * 19 + date.monthValue * 37) % 7)
-                    when (seed) {
-                        0 -> 1850L
-                        1 -> 2120L
-                        2 -> 1680L
-                        3 -> 1940L
-                        4 -> 1760L
-                        5 -> 2250L
-                        else -> 1520L
-                    }
-                }
+                offset < 0 -> historyMap[fullDateStr] ?: 0L
                 else -> 0L // Future days have 0 steps
             }
 
