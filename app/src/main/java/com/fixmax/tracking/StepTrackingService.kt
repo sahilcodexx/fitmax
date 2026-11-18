@@ -1,8 +1,10 @@
 package com.fixmax.tracking
 
 import android.app.*
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -11,6 +13,7 @@ import android.hardware.SensorManager
 import android.os.*
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.fixmax.core.common.*
 import com.fixmax.core.detection.*
 import com.fixmax.core.processing.*
@@ -18,6 +21,7 @@ import com.fixmax.data.database.FixMaxDatabase
 import com.fixmax.data.database.SensorCheckpointEntity
 import com.fixmax.data.repository.StepRepository
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.time.LocalDate
@@ -78,6 +82,18 @@ class StepTrackingService : Service(), SensorEventListener {
     private var lastHardwareSteps = -1L
     private var baseOffset = 0L
 
+    // Ordered sensor pipeline from Tally architecture: avoids concurrent coroutine races and double-counting
+    private val sensorQueue = Channel<Long>(Channel.UNLIMITED)
+    private var sensorJob: Job? = null
+    private var observeTodayJob: Job? = null
+    private var dateRegistered = false
+
+    private val dateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            startObservingToday()
+        }
+    }
+
     // Custom DSP Pipeline instances
     private val gravityFilter = GravityFilter(cutoffHz = 0.30f, samplingRateHz = 50.0f)
     private val signalFilter = SignalFilter()
@@ -93,7 +109,7 @@ class StepTrackingService : Service(), SensorEventListener {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         handlerThread = HandlerThread("FixMaxSensorThread", Process.THREAD_PRIORITY_MORE_FAVORABLE).apply { start() }
         backgroundHandler = Handler(handlerThread.looper)
-        repository = StepRepository(FixMaxDatabase.getInstance(this))
+        repository = StepRepository.getInstance(this)
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FixMax:TrackingWakeLock").apply {
@@ -101,22 +117,31 @@ class StepTrackingService : Service(), SensorEventListener {
         }
 
         createChannel()
-        scope.launch {
-            val today = LocalDate.now().toString()
-            val summary = repository.observeToday(today)
-            summary.collect {
-                if (it != null) {
-                    _liveStepsToday.value = it.totalSteps
-                }
+        registerDateReceiver()
+        startObservingToday()
+    }
+
+    private fun startObservingToday() {
+        observeTodayJob?.cancel()
+        val today = LocalDate.now().toString()
+        observeTodayJob = scope.launch {
+            repository.observeToday(today).collect { summary ->
+                val steps = summary?.totalSteps ?: 0L
+                _liveStepsToday.value = steps
+                updateNotification(steps)
             }
         }
-        scope.launch {
-            val cp = repository.getCheckpoint()
-            if (cp != null) {
-                lastHardwareSteps = cp.lastCumulativeHardwareReading
-                baseOffset = cp.accumulatedStepsBeforeReboot
-            }
+    }
+
+    private fun registerDateReceiver() {
+        if (dateRegistered) return
+        dateRegistered = true
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_DATE_CHANGED)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
         }
+        ContextCompat.registerReceiver(this, dateReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -129,6 +154,14 @@ class StepTrackingService : Service(), SensorEventListener {
         wakeLock?.acquire(24 * 60 * 60 * 1000L) // 24hr max with safety
         registerSensors()
         _isServiceRunning.value = true
+
+        if (sensorJob == null) {
+            sensorJob = scope.launch {
+                for (counter in sensorQueue) {
+                    processHardwareStepCounter(counter)
+                }
+            }
+        }
         return START_STICKY
     }
 
@@ -213,7 +246,9 @@ class StepTrackingService : Service(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
             Sensor.TYPE_STEP_COUNTER -> {
-                handleHardwareStepCounter(event.values[0].toLong())
+                if (event.values.isNotEmpty()) {
+                    sensorQueue.trySend(event.values[0].toLong())
+                }
             }
             Sensor.TYPE_STEP_DETECTOR -> {
                 // If hardware step counter is dormant/latent, detector gives immediate pulse
@@ -225,56 +260,37 @@ class StepTrackingService : Service(), SensorEventListener {
         }
     }
 
-    private fun handleHardwareStepCounter(current: Long) {
+    private suspend fun processHardwareStepCounter(counter: Long) {
         hasHardwareStepCounter = true
         lastHardwareStepTimeMs = SystemClock.elapsedRealtime()
         val today = LocalDate.now().toString()
 
         val prefs = getSharedPreferences("fixmax_step_tracking", Context.MODE_PRIVATE)
-        val savedDate = prefs.getString("tracked_date", null)
-        var dayStartHw = prefs.getLong("day_start_hw_reading", -1L)
-        var rebootOffset = prefs.getLong("reboot_offset", 0L)
-        val lastSeenHw = prefs.getLong("last_seen_hw_reading", current)
+        val baseline = prefs.getLong("hw_baseline", -1L)
 
-        if (savedDate != today || dayStartHw < 0L) {
-            // New day or first tracking session
-            if (today == "2026-11-18" && (dayStartHw < 0L || savedDate != today)) {
-                // Calibrate today's baseline to match user's watch count (1,947 steps)
-                dayStartHw = (current - 1947L).coerceAtLeast(0L)
-            } else {
-                dayStartHw = current
-            }
-            rebootOffset = 0L
+        if (baseline < 0L || counter < baseline) {
+            // First reading ever, or device rebooted (hardware counter restarted from 0):
+            // Rebaseline to current hardware counter. Delta is 0.
             prefs.edit()
+                .putLong("hw_baseline", counter)
                 .putString("tracked_date", today)
-                .putLong("day_start_hw_reading", dayStartHw)
-                .putLong("reboot_offset", rebootOffset)
-                .putLong("last_seen_hw_reading", current)
                 .apply()
-        } else {
-            // Same day: check for device reboot
-            if (current < lastSeenHw) {
-                val stepsBeforeReboot = (lastSeenHw - dayStartHw).coerceAtLeast(0L)
-                rebootOffset += stepsBeforeReboot
-                dayStartHw = 0L
-                prefs.edit()
-                    .putLong("day_start_hw_reading", dayStartHw)
-                    .putLong("reboot_offset", rebootOffset)
-                    .apply()
-            }
+            return
         }
 
-        prefs.edit().putLong("last_seen_hw_reading", current).apply()
+        val delta = counter - baseline
+        // Always advance baseline
+        prefs.edit()
+            .putLong("hw_baseline", counter)
+            .putString("tracked_date", today)
+            .apply()
 
-        val computedTodaySteps = ((current - dayStartHw) + rebootOffset).coerceAtLeast(0L)
-
-        scope.launch {
-            repository.setTodaySteps(today, computedTodaySteps)
-            _liveStepsToday.value = computedTodaySteps
+        // Sanity check: valid step delta (1 to 50,000 steps between events)
+        if (delta in 1..50_000) {
+            repository.addSteps(today, delta)
             repository.saveCheckpoint(
-                SensorCheckpointEntity(1, System.currentTimeMillis(), current, rebootOffset, SystemClock.elapsedRealtime())
+                SensorCheckpointEntity(1, System.currentTimeMillis(), counter, 0L, SystemClock.elapsedRealtime())
             )
-            updateNotification(computedTodaySteps)
         }
     }
 
@@ -361,6 +377,12 @@ class StepTrackingService : Service(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         _isServiceRunning.value = false
+        if (dateRegistered) {
+            runCatching { unregisterReceiver(dateReceiver) }
+            dateRegistered = false
+        }
+        sensorJob?.cancel()
+        sensorQueue.close()
         unregisterSensors()
         wakeLock?.let { if (it.isHeld) it.release() }
         handlerThread.quitSafely()
