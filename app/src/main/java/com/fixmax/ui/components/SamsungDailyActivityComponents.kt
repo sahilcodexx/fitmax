@@ -25,9 +25,9 @@ import androidx.compose.ui.unit.sp
  */
 @Composable
 fun SamsungDailyActivityCard(
-    steps: Int = 7842,
-    activeMinutes: Int = 54,
-    caloriesBurned: Int = 320,
+    steps: Int = 0,
+    activeMinutes: Int = 0,
+    caloriesBurned: Int = 0,
     stepsGoal: Int = 10000,
     activeMinutesGoal: Int = 60,
     caloriesGoal: Int = 500,

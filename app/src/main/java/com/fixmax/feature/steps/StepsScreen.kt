@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fixmax.data.repository.HealthMetricsEngine
+import com.fixmax.data.repository.StepRepository
 import com.fixmax.tracking.StepTrackingService
 import com.fixmax.ui.components.FitMaxCustomCalendarSheet
 import com.fixmax.ui.components.m3BounceClick
@@ -73,14 +74,21 @@ import kotlin.math.roundToInt
 fun StepsScreen(
     onBack: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val repository = remember { StepRepository.getInstance(context) }
+    val allSummaries by repository.observeAllSummaries().collectAsState(initial = emptyList())
+    val historyMap = remember(allSummaries) {
+        allSummaries.associate { it.date to it.totalSteps }
+    }
+
     val liveSteps by StepTrackingService.liveStepsToday.collectAsState()
-    val baseSteps = if (liveSteps > 0) liveSteps else 1947L
+    val baseSteps = liveSteps.coerceAtLeast(0L)
 
     var referenceDate by remember { mutableStateOf(LocalDate.now()) }
 
     // Dynamic full date history (past 30 days + future 14 days, today at index 30)
-    val weeklyHistory = remember(baseSteps, referenceDate) {
-        HealthMetricsEngine.generateWeeklyHistory(baseSteps, referenceDate)
+    val weeklyHistory = remember(baseSteps, referenceDate, historyMap) {
+        HealthMetricsEngine.generateWeeklyHistory(baseSteps, referenceDate, historyMap)
     }
 
     var selectedDayIndex by remember { mutableIntStateOf(HealthMetricsEngine.TODAY_INDEX) }
@@ -121,7 +129,6 @@ fun StepsScreen(
     val itemSpacingPx = remember(density) { with(density) { 74.dp.toPx() } }
     val itemWidthPx = remember(density) { with(density) { 60.dp.toPx() } }
     val maxDipPx = remember(density) { with(density) { 36.dp.toPx() } }
-    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -377,7 +384,7 @@ fun StepsScreen(
         val formattedTimeHours = String.format(Locale.US, "%d:%02d", activeMins / 60, activeMins % 60)
         WorkoutTasksGrid(
             timeHours = formattedTimeHours,
-            exerciseTasks = "${(currentSnapshot.activeMinutes / 10).coerceAtLeast(1)}/8",
+            exerciseTasks = "${(currentSnapshot.activeMinutes / 15).coerceIn(0, 8)}/8",
             onClickTime = { showMetricDialog = "Workout Time" },
             onClickExercises = { showMetricDialog = "Completed Tasks" }
         )
@@ -462,7 +469,7 @@ fun StepsScreen(
                             Text("• Target Goal: ${currentSnapshot.goalActiveMinutes} mins", color = Color(0xFF005A43), fontSize = 13.sp)
                         }
                         "Completed Tasks" -> {
-                            Text("• Exercises Completed: ${(currentSnapshot.activeMinutes / 10).coerceAtLeast(1)} of 8 tasks", color = Color(0xFF111417), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("• Exercises Completed: ${(currentSnapshot.activeMinutes / 15).coerceIn(0, 8)} of 8 tasks", color = Color(0xFF111417), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             Text("• Calories Burned: ${currentSnapshot.caloriesBurned} kcal", color = Color(0xFF2E7D32), fontSize = 13.sp)
                             Text("• Intensity: Dynamic cardio cadence", color = Color(0xFF6B7280), fontSize = 13.sp)
                         }

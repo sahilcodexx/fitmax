@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import java.text.NumberFormat
 import java.util.Locale
 import com.fixmax.data.repository.HealthMetricsEngine
+import com.fixmax.data.repository.StepRepository
 
 data class WeekdayActivityRecord(
     val dayLetter: String,
@@ -43,17 +44,22 @@ data class WeekdayActivityRecord(
 @Composable
 fun SamsungDailyActivityDetailSheet(
     onDismiss: () -> Unit,
-    steps: Int = 7842,
-    activeMinutes: Int = 54,
-    caloriesBurned: Int = 320,
+    steps: Int = 0,
+    activeMinutes: Int = 0,
+    caloriesBurned: Int = 0,
     stepsGoal: Int = 10000,
     activeMinutesGoal: Int = 60,
     caloriesGoal: Int = 500
 ) {
     val context = LocalContext.current
+    val repository = remember { StepRepository.getInstance(context) }
+    val allSummaries by repository.observeAllSummaries().collectAsState(initial = emptyList())
+    val historyMap = remember(allSummaries) {
+        allSummaries.associate { it.date to it.totalSteps }
+    }
 
-    val weekData = remember(steps, activeMinutes, caloriesBurned) {
-        val history = HealthMetricsEngine.generateWeeklyHistory(steps.toLong())
+    val weekData = remember(steps, activeMinutes, caloriesBurned, historyMap) {
+        val history = HealthMetricsEngine.generateWeeklyHistory(steps.toLong(), historyMap = historyMap)
         val todayIdx = HealthMetricsEngine.TODAY_INDEX
         val startIndex = (todayIdx - 3).coerceAtLeast(0)
         val slice = history.subList(startIndex, (startIndex + 7).coerceAtMost(history.size))
@@ -61,11 +67,11 @@ fun SamsungDailyActivityDetailSheet(
             val isToday = idx == 3
             WeekdayActivityRecord(
                 dayLetter = s.dayLabel.first().toString(),
-                fullDate = if (isToday) "Today (${s.dayLabel}, Nov ${s.dateNumber})" else "${s.dayLabel}, Nov ${s.dateNumber}",
+                fullDate = if (isToday) "Today (${s.dayLabel}, ${s.dateNumber})" else "${s.dayLabel}, ${s.dateNumber}",
                 steps = s.steps.toInt(),
                 activeMinutes = s.activeMinutes,
                 caloriesBurned = s.caloriesBurned,
-                totalBurned = "${NumberFormat.getNumberInstance(Locale.US).format(s.caloriesBurned + 1400)} Cal",
+                totalBurned = if (s.caloriesBurned > 0) "${NumberFormat.getNumberInstance(Locale.US).format(s.caloriesBurned + 1400)} Cal" else "0 Cal",
                 distance = s.formattedDistance,
                 isToday = isToday
             )
