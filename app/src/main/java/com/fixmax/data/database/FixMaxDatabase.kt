@@ -53,6 +53,12 @@ interface DailySummaryDao {
     @Query("SELECT * FROM daily_summaries WHERE date = :date LIMIT 1")
     suspend fun getDailySummary(date: String): DailySummaryEntity?
 
+    @Query("SELECT * FROM daily_summaries")
+    fun observeAllSummaries(): Flow<List<DailySummaryEntity>>
+
+    @Query("SELECT * FROM daily_summaries")
+    suspend fun getAllSummaries(): List<DailySummaryEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(summary: DailySummaryEntity)
 
